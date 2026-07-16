@@ -4,46 +4,52 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User; // Mengimpor Model User untuk keperluan registrasi dinamis
+use App\Models\User;
 
 class AuthController extends Controller 
 {
+    /**
+     * TAMPILAN BARU: Menampilkan halaman Form Login Sistem SIP-O-SIBER.
+     * Mencegah crash internal akibat ketidaktersediaan method GET handler.
+     */
+    public function showLoginForm()
+    {
+        // Memastikan sistem mengembalikan visual dari resources/views/auth/login.blade.php
+        return view('auth.login');
+    }
+
     /**
      * Menangani proses autentikasi masuk pengguna (Admin / Petugas).
      */
     public function login(Request $request) 
     {
-        // 1. Validasi format input dari form login
         $credentials = $request->validate([
-            'username' => 'required|string',
+            'username' => 'required|string', 
             'password' => 'required|string',
         ]);
 
-        // 2. Percobaan autentikasi kredensial ke database
         if (Auth::attempt($credentials)) {
-            // Regenerasi session untuk mencegah serangan Session Fixation
+            
             $request->session()->regenerate();
             
             $user = Auth::user();
 
-            // 3. Pengalihan halaman awal menuju Gerbang Absensi sesuai Hak Akses Instansi
-            // Menggunakan strcasecmp agar pengecekan string kebal terhadap perbedaan huruf besar/kecil (Admin / admin)
             if (strcasecmp($user->role, 'Admin') === 0) {
                 return redirect()
-                    ->route('admin.dashboard') // 🚀 DIUBAH: Langsung ke dashboard admin, biarkan middleware internal yang mengecek status absen harian jika diperlukan
+                    ->route('admin.dashboard')
                     ->with('success', 'Otorisasi Berhasil. Selamat datang Admin pada repositori pusat SIP-O-SIBER.');
             }
 
-            // Jika role bukan Admin (default ke Petugas/Operator)
             return redirect()
-                ->route('petugas.attendance.form') // Diarahkan ke form absen Petugas lapangan
-                ->with('success', 'Koneksi Terhubung. Selamat bekerja, Operator ' . $user->name . '. Harap lakukan presensi harian terlebih dahulu.');
+                ->route('petugas.dashboard')
+                ->with('success', 'Koneksi Terhubung. Selamat bekerja, Operator ' . $user->name . '.');
         }
 
-        // 4. Jika autentikasi gagal, kembalikan dengan pesan error kedinasan
         return back()
             ->withInput($request->only('username'))
-            ->withErrors(['username' => 'Akses ditolak. Username atau password tidak terdaftar pada repositori pusat.']);
+            ->withErrors([
+                'login_error' => 'Akses ditolak. NPM atau kata sandi tidak cocok dengan repositori pusat.'
+            ]);
     }
 
     /**
@@ -59,30 +65,34 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
-        // 1. Validasi input form registrasi mandiri
         $request->validate([
-            'name' => 'required|string|max:255',
-            'username' => 'required|string|min:4|unique:users,username|alpha_dash',
-            'password' => 'required|string|min:6|confirmed', // 'confirmed' mencocokkan dengan input password_confirmation
+            'name'     => 'required|string|max:255',
+            'username' => 'required|numeric|unique:users,username', 
+            'email'    => 'required|email|unique:users,email',      
+            'password' => 'required|string|min:6|confirmed',        
         ], [
-            'username.unique' => 'Username ini sudah digunakan oleh petugas lain.',
-            'username.alpha_dash' => 'Username hanya boleh berisi huruf, angka, strip, dan underscore tanpa spasi.',
+            'username.required'  => 'NPM wajib diisi.',
+            'username.numeric'   => 'NPM hanya boleh berisi angka.',
+            'username.unique'    => 'NPM ini sudah terdaftar di sistem. Gunakan NPM lain.',
+            'email.required'     => 'Email kontak wajib diisi.',
+            'email.email'        => 'Format penulisan email tidak valid.',
+            'email.unique'       => 'Email ini sudah digunakan oleh pengguna lain.',
+            'password.required'  => 'Kata sandi wajib diisi.',
             'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
-            'password.min' => 'Kata sandi minimal harus 6 karakter.'
+            'password.min'       => 'Kata sandi minimal harus 6 karakter.'
         ]);
-
-        // 2. Simpan data petugas baru ke database (Role otomatis dikunci sebagai 'Petugas')
+        
         User::create([
-            'name' => $request->name,
-            'username' => strtolower($request->username), // Standarisasi username ke huruf kecil semua
-            'password' => $request->password, // Otomatis di-hash oleh mutator setPasswordAttribute di model User.php
-            'role' => 'Petugas', 
+            'name'     => $request->name,
+            'username' => $request->username, 
+            'email'    => $request->email,    
+            'password' => $request->password, 
+            'role'     => 'Petugas', 
         ]);
 
-        // 3. Alihkan ke gerbang login utama dengan pesan instruksi sukses
         return redirect()
             ->route('login')
-            ->with('success', 'Registrasi berhasil! Akun Anda telah terdaftar dalam sistem SIP-O-SIBER. Silakan masuk.');
+            ->with('success', 'Registrasi berhasil! Data NPM dan Akun Anda telah tersimpan. Silakan masuk.');
     }
 
     /**
@@ -90,16 +100,12 @@ class AuthController extends Controller
      */
     public function logout(Request $request) 
     {
-        // Proses logout dari facade Auth Laravel
         Auth::logout();
         
-        // Menghancurkan session aktif saat ini
         $request->session()->invalidate();
         
-        // Regenerasi token CSRF baru demi keamanan jaringan pasca-logout
         $request->session()->regenerateToken();
         
-        // Pengalihan kembali ke gerbang login utama
         return redirect('/login')->with('success', 'Sesi login instansi telah ditutup dengan aman.');
     }
 }

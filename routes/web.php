@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PatrolController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\Admin\MasterOpdController;
+use App\Http\Controllers\Admin\MasterKategoriController;
 
 /*
 |--------------------------------------------------------------------------
@@ -11,72 +13,133 @@ use App\Http\Controllers\AttendanceController;
 |--------------------------------------------------------------------------
 */
 
-// Halaman Utama Langsung Menampilkan Form Login (Menghindari Pengalihan Berulang / Loop)
-Route::get('/', function () {
-    return view('auth.login');
-});
-
-// Jalur Autentikasi & Registrasi (Hanya untuk Tamu / Belum Login)
+// ==========================================
+// 1. ZONA UMUM / PENGUNJUNG (GUEST ZONES)
+// ==========================================
 Route::middleware(['guest'])->group(function () {
-    // Jalur Masuk Sistem (Login)
-    Route::get('/login', function () { 
-        return view('auth.login'); 
-    })->name('login');
+    // Gerbang Masuk Otentikasi Terpusat
+    Route::get('/', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::get('/login', [AuthController::class, 'showLoginForm']);
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 
-    // Jalur Registrasi Mandiri Petugas Baru
+    // Alur Registrasi Akun Mandiri Personel Baru
     Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->name('register.post');
 });
 
-// Proses Putus Sesi (Logout) - Ditempatkan di Luar Middleware Auth untuk Kemudahan Reset Sesi
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout'); 
+// Sesi Pemutusan Autentikasi (Logout)
+Route::middleware(['auth'])->group(function () {
+    Route::any('/logout', [AuthController::class, 'logout'])->name('logout');
+});
 
-// Jalur Terproteksi Sistem (Harus Login Terlebih Dahulu)
+// ==========================================
+// 2. ZONA TERPROTEKSI (AUTHENTICATED ZONES)
+// ==========================================
 Route::middleware(['auth'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | OTORITAS: OPERATOR / PETUGAS LAPANGAN
+    | HAK AKSES ROLE: OPERATOR / PETUGAS LAPANGAN
     |--------------------------------------------------------------------------
-    | Menggunakan parameter 'Petugas' sesuai dengan nilai role di database.
     */
-    Route::middleware(['checkRole:Petugas'])->group(function () {
-        // 1. HALAMAN PENGADANGAN / CHECKPOINT (Standalone Form Absen Mandiri)
-        Route::get('/petugas/check-attendance', [AttendanceController::class, 'showCheckForm'])->name('petugas.attendance.form');
+    Route::middleware(['checkRole:Petugas'])->prefix('petugas')->name('petugas.')->group(function () {
         
-        // 2. PROSES TRANSMISI LOG PRESENSI HARIAN (MANUAL)
-        Route::post('/petugas/attendance', [AttendanceController::class, 'store'])->name('petugas.attendance.store');
-        
-        // 3. HALAMAN UTAMA PANEL KONTROL PETUGAS
-        Route::get('/petugas/dashboard', [PatrolController::class, 'index'])->name('petugas.dashboard');
-        
-        // 4. TRANSMISI UNGGAH BERKAS LAPORAN KERJA KE SISTEM
-        Route::post('/petugas/patrol/store', [PatrolController::class, 'store'])->name('petugas.patrol.store');
+        // 🚨 LEVEL 1 GATING: Pintu Masuk Absensi Mandiri (Bisa diakses SAAT/SEBELUM absen)
+        Route::get('/check-attendance', [AttendanceController::class, 'showCheckForm'])->name('attendance.form');
+        Route::post('/attendance/store', [AttendanceController::class, 'store'])->name('attendance.store');
+        Route::get('/attendance/my-log', [AttendanceController::class, 'myAttendanceLog'])->name('attendance.log');
+
+        // 🚨 LEVEL 2 GATING: Wajib Lolos Validasi Presensi Masuk Hari Ini via Middleware
+        Route::middleware(['ensureClockedIn'])->group(function () {
+            
+            // --- MODUL UTAMA PANEL KONTROL & METRIKS ---
+            Route::get('/dashboard', [PatrolController::class, 'index'])->name('dashboard');
+            
+            // --- MODUL INPUT LOG PATROLI BARU ---
+            Route::get('/patrol/create', [PatrolController::class, 'create'])->name('patrol.create');
+            Route::post('/patrol/store', [PatrolController::class, 'store'])->name('patrol.store');
+            
+            // --- MODUL REVISI & KOREKSI DATA ---
+            Route::get('/patrol/{id}/edit', [PatrolController::class, 'edit'])->name('patrol.edit')->whereNumber('id');
+            Route::put('/patrol/{id}/update', [PatrolController::class, 'update'])->name('patrol.update')->whereNumber('id');
+            
+            // --- MODUL TRASABILITAS HISTORIS ---
+            Route::get('/patrol/history', [PatrolController::class, 'history'])->name('patrol.history');
+            Route::get('/patrol/{id}/detail', [PatrolController::class, 'show'])->name('patrol.show')->whereNumber('id');
+        });
     });
 
     /*
     |--------------------------------------------------------------------------
-    | OTORITAS: ADMINISTRATOR PUSAT
+    | HAK AKSES ROLE: ADMINISTRATOR PUSAT
     |--------------------------------------------------------------------------
-    | Menggunakan parameter 'Admin' untuk mengunci seluruh hak akses internal admin.
     */
-    Route::middleware(['checkRole:Admin'])->group(function () {
-        // 1. HALAMAN GERBANG ABSENSI KHUSUS ADMIN (Agar Tampilan Tidak Tertukar)
-        Route::get('/admin/check-attendance', [AttendanceController::class, 'showCheckForm'])->name('admin.attendance.form');
-        Route::post('/admin/attendance', [AttendanceController::class, 'store'])->name('admin.attendance.store');
+    Route::middleware(['checkRole:Admin'])->prefix('admin')->name('admin.')->group(function () {
+        
+        // 🛡️ LEVEL 1 GATING SAFE-ZONE: Formulir Presensi Mandiri Khusus Admin
+        Route::get('/check-attendance', [AttendanceController::class, 'showCheckForm'])->name('attendance.form');
+        Route::post('/attendance/store', [AttendanceController::class, 'store'])->name('attendance.store');
+        
+        // 🚨 LEVEL 2 GATING ZONE: Wajib Lolos Validasi Kerja Presensi Masuk Hari Ini
+        Route::middleware(['ensureClockedIn'])->group(function () {
+            
+            // --- MODUL UTAMA PANEL PUSAT & STATISTIK GRAFIK ---
+            Route::get('/dashboard', [PatrolController::class, 'adminDashboard'])->name('dashboard');
 
-        // 2. HALAMAN UTAMA PANEL KONTROL PUSAT ADMIN
-        Route::get('/admin/dashboard', [PatrolController::class, 'adminDashboard'])->name('admin.dashboard');
-        
-        // Validasi Matrix & Koreksi Laporan Petugas
-        Route::post('/admin/patrol/{id}/update-status', [PatrolController::class, 'updateStatus'])->name('admin.patrol.update-status');
-        
-        // Penghapusan Berkas Laporan dari Log Jaringan
-        Route::delete('/admin/patrol/{id}/delete', [PatrolController::class, 'destroy'])->name('admin.patrol.delete');
-        
-        // Pemantauan Log Rekap Absensi Seluruh Petugas
-        Route::get('/admin/attendances', [AttendanceController::class, 'index'])->name('admin.attendances');
+            // --- MANAJEMEN DATA & VALIDASI MATRIX LAPORAN ---
+            // Alias 'admin.validasi' disinkronkan untuk kebutuhan tombol menu sidebar
+            Route::get('/patrols/all', [PatrolController::class, 'allPatrols'])->name('validasi');
+            Route::post('/patrol/{id}/update-status', [PatrolController::class, 'updateStatus'])->name('patrol.update-status')->whereNumber('id');
+            Route::delete('/patrol/{id}/delete', [PatrolController::class, 'destroy'])->name('patrol.delete')->whereNumber('id');
+            
+            // --- MODUL FOLDER ARSIP & DISTRIBUSI ELEKTRONIK ---
+            Route::get('/patrol/{id}/generate-pdf', [PatrolController::class, 'generatePdf'])->name('patrol.pdf')->whereNumber('id');
+            
+            // Rute Distribusi Laporan Elektronik (SMTP Setup) - Mengakomodasi tombol 'admin.smtp'
+            Route::get('/smtp/distribution', [PatrolController::class, 'showSmtpSettings'])->name('smtp');
+            Route::post('/patrol/{id}/distribute-email', [PatrolController::class, 'distributeEmail'])->name('patrol.distribute')->whereNumber('id');
+            
+            // Alias 'admin.folder_virtual' disinkronkan untuk kebutuhan tombol menu sidebar
+            Route::get('/archives/folders', [PatrolController::class, 'archiveFolders'])->name('folder_virtual');
+            
+            // --- MODUL MANAJEMEN MASTER DATA KLASTER ---
+            // Menggunakan penamaan eksplisit agar sinkron dengan requestIs('admin.master_opd') di layout
+            Route::resource('master-opd', MasterOpdController::class)->names([
+                'index' => 'master_opd'
+            ]);
+            Route::resource('master-kategori', MasterKategoriController::class);
+
+            // --- MONITORING LOG REKAP ABSENSI GLOBAL ---
+            // Alias 'admin.absensi' disinkronkan untuk kebutuhan pemantauan log absensi petugas di sidebar
+            Route::get('/attendances', [AttendanceController::class, 'index'])->name('absensi');
+            Route::get('/attendances/export-excel', [AttendanceController::class, 'exportExcel'])->name('attendance.export');
+        });
     });
 
+    /*
+    |--------------------------------------------------------------------------
+    | INTELLIGENT FALLBACK REDIRECTOR
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/home', function () {
+        $user = auth()->user();
+        if (strcasecmp($user->role, 'Admin') === 0) {
+            return redirect()->route('admin.dashboard');
+        }
+        return redirect()->route('petugas.dashboard');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| ZONA PROTEKSI FALLBACK GLOBAL (404 SAFETY NET)
+|--------------------------------------------------------------------------
+*/
+Route::fallback(function () {
+    if (auth()->check()) {
+        return auth()->user()->role === 'Admin' 
+            ? redirect()->route('admin.dashboard')->with('error', 'Enkripsi Peringatan: Jalur URL tidak ditemukan.')
+            : redirect()->route('petugas.dashboard')->with('error', 'Enkripsi Peringatan: Jalur URL tidak ditemukan.');
+    }
+    return redirect()->route('login')->with('error', 'Akses Ditolak: Alamat URL berada di luar enkripsi SIP-O-SIBER.');
 });

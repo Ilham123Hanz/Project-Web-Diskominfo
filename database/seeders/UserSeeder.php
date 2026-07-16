@@ -6,41 +6,95 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\App;
+use Faker\Factory as Faker;
 
 class UserSeeder extends Seeder 
 {
     /**
-     * Menjalankan seeding data dengan username dinamis dan password terenkripsi.
+     * Menjalankan seeding data user dengan role Admin dan Petugas.
+     * Menggunakan pendekatan idempotent (aman dijalankan berulang kali).
      */
     public function run(): void 
     {
-        // Guna menghindari masalah foreign key saat membersihkan data, kita matikan cek foreign key sebentar
-        Schema::disableForeignKeyConstraints();
-        User::truncate(); // Sapu bersih data user lama yang password-nya masih teks polos
-        Schema::enableForeignKeyConstraints();
+        // Hindari error integrity constraint (Foreign Key) jika ingin membersihkan data lokal
+        if (App::environment('local')) {
+            Schema::disableForeignKeyConstraints();
+            User::truncate(); 
+            Schema::enableForeignKeyConstraints();
+        }
 
-        // 1. Akun ADMIN (Menggunakan nama asli admin & password kombinasi instansi)
-        User::create([
-            'name'     => 'Ahmad Sanusi',              // Nama asli Admin
-            'username' => 'ahmad.sanusi',             // Username menyesuaikan nama
-            'password' => Hash::make('Sanusi@Siber2026'), // Terenkripsi menggunakan bcrypt via Hash::make
-            'role'     => 'Admin',
-        ]);
+        // =========================================================================
+        // 1. DATA MASTER CORE USER (ADMIN & PETUGAS TETAP)
+        // =========================================================================
+        $coreUsers = [
+            // Sub-Grup: Administrator
+            [
+                'name'     => 'Iswara',
+                'username' => 'iswara.admin',
+                'password' => Hash::make('Iswara@Siber2026'),
+                'role'     => 'Admin',
+            ],
+            [
+                'name'     => 'Manda',
+                'username' => 'manda.admin',
+                'password' => Hash::make('Manda@Siber2026'),
+                'role'     => 'Admin',
+            ],
+            [
+                'name'     => 'Arie',
+                'username' => 'arie.admin',
+                'password' => Hash::make('Arie@Siber2026'),
+                'role'     => 'Admin',
+            ],
+            // Sub-Grup: Petugas Lapangan Utama
+            [
+                'name'     => 'Rian Hidayat',
+                'username' => 'rian.hidayat',
+                'password' => Hash::make('Rian@Siber2026'),
+                'role'     => 'Petugas',
+            ],
+            [
+                'name'     => 'Siti Aminah',
+                'username' => 'siti.aminah',
+                'password' => Hash::make('Siti@Siber2026'),
+                'role'     => 'Petugas',
+            ],
+        ];
 
-        // 2. Akun PETUGAS / OPERATOR 1
-        User::create([
-            'name'     => 'Rian Hidayat',              // Nama asli Petugas
-            'username' => 'rian.hidayat',             // Username menyesuaikan nama
-            'password' => Hash::make('Rian@Siber2026'), // Terenkripsi menggunakan bcrypt via Hash::make
-            'role'     => 'Petugas',
-        ]);
+        // Eksekusi menggunakan updateOrCreate untuk mencegah error duplikasi saat seed berulang
+        foreach ($coreUsers as $user) {
+            User::updateOrCreate(
+                ['username' => $user['username']], // Kunci pengecekan unik
+                [
+                    'name'     => $user['name'],
+                    'password' => $user['password'],
+                    'role'     => $user['role'],
+                ]
+            );
+        }
 
-        // 3. Akun PETUGAS / OPERATOR 2 (Contoh tambahan jika ada petugas lain)
-        User::create([
-            'name'     => 'Siti Aminah',
-            'username' => 'siti.aminah',
-            'password' => Hash::make('Siti@Siber2026'), // Terenkripsi menggunakan bcrypt via Hash::make
-            'role'     => 'Petugas',
-        ]);
+        // =========================================================================
+        // 2. OPSI DATA TAMBAHAN (HANYA AKTIF PADA LINGKUNGAN TESTING/LOCAL)
+        // =========================================================================
+        if (App::environment('local', 'testing')) {
+            $faker = Faker::create('id_ID'); // Melokalisasi generator nama ke Indonesia
+            
+            // Buat 15 akun petugas dummy tambahan untuk testing pagination tabel rekap admin
+            for ($i = 1; $i <= 15; $i++) {
+                $firstName = $faker->firstName;
+                $lastName  = $faker->lastName;
+                $username  = strtolower($firstName . '.' . $lastName . rand(10, 99));
+
+                User::updateOrCreate(
+                    ['username' => $username],
+                    [
+                        'name'     => $firstName . ' ' . $lastName,
+                        'password' => Hash::make('Petugas@2026'), // Password standard untuk akun tiruan
+                        'role'     => 'Petugas',
+                    ]
+                );
+            }
+        }
     }
 }

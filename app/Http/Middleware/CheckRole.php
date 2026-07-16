@@ -6,69 +6,50 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
-use App\Models\Attendance;
-use Carbon\Carbon;
+use Log;
 
 class CheckRole 
 {
     /**
-     * Menangani pemfilteran hak akses masuk rute (Role & Checkpoint Absensi).
+     * Menangani pemfilteran hak akses masuk rute berdasarkan Tipe Otoritas (Role-Based Access Control).
+     * Teroptimasi penuh: Menghilangkan pengecekan absensi ganda untuk mencegah putaran redirect (Looping Protection).
      */
-    public function handle(Request $request, Closure $next, $role): Response 
+    public function handle(Request $request, Closure $next, string $role): Response 
     {
-        // 1. KONTROL OTORISASI DASAR: Pastikan pengguna sudah masuk sistem
+        // 1. KONTROL OTORISASI DASAR: Pastikan pengguna sudah terautentikasi (Logged In)
         if (!Auth::check()) {
-            return redirect()->route('login');
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Unauthenticated.'], 401);
+            }
+            return redirect()->route('login')->with('error', 'Sesi Berakhir: Silakan masuk kembali ke sistem.');
         }
 
         $user = Auth::user();
 
-        // 2. PROTEKSI SILANG (CROSS-ROLE PROTECTION)
-        // Jika role user tidak sesuai dengan kriteria rute yang diminta
+        // 2. PROTEKSI SILANG & STRATIFIKASI ROLE (CROSS-ROLE PROTECTION)
+        // Menggunakan perbandingan string case-insensitive yang aman dari manipulasi input character
         if (strcasecmp($user->role, $role) !== 0) {
-            // Jika user adalah Admin tapi nyasar ke rute Petugas, arahkan paksa ke halaman Admin yang tepat
-            if (strcasecmp($user->role, 'Admin') === 0) {
-                return redirect()->route('admin.dashboard');
+            Log::warning("Akses Ilegal Terblokir: User ID {$user->id} dengan Role '{$user->role}' mencoba mengakses area khusus '{$role}' pada URL: " . $request->fullUrl());
+
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Forbidden Access.'], 403);
             }
-            // Jika user adalah Petugas tapi mencoba membobol rute Admin, buang ke dashboard petugas
-            return redirect()->route('petugas.dashboard')->with('error', 'Akses ditolak: Anda tidak memiliki otoritas Administrator Pusat.');
+
+            // Pengalihan cerdas sesuai hak operasional aktual user
+            if (strcasecmp($user->role, 'Admin') === 0) {
+                return redirect()->route('admin.attendance.form')->with('error', 'Proteksi Akses: Anda dialihkan ke gerbang kontrol Admin.');
+            }
+            
+            if (strcasecmp($user->role, 'Petugas') === 0) {
+                return redirect()->route('petugas.attendance.form')->with('error', 'Akses Ditolak: Hak akses dibatasi hanya untuk Administrator Pusat.');
+            }
+
+            // Jika role tidak dikenal di sistem siber, paksa hancurkan sesi login
+            Auth::logout();
+            return redirect()->route('login')->with('error', 'Kredensial Rusak: Token otoritas tidak valid.');
         }
 
-        // 3. GATEKEEPER ABSENSI HARIAN GLOBAL
-        $userId = Auth::id();
-        $today = Carbon::today()->toDateString();
-
-        // Cek log presensi masuk hari ini
-        $hasMasuk = Attendance::where('user_id', $userId)
-                              ->where('date', $today)
-                              ->where('shift', 'Masuk')
-                              ->exists();
-
-        // Cek log presensi pulang sore hari ini
-        $hasPulang = Attendance::where('user_id', $userId)
-                               ->where('date', $today)
-                               ->where('shift', 'Pulang')
-                               ->exists();
-
-        // Deteksi URL rute absensi secara presisi agar tidak terjadi infinite loop redirect
-        $isAttendanceRoute = $request->is('*check-attendance*') || $request->is('*attendance*');
-
-        // KONDISI A: Jika BELUM absen masuk hari ini dan mencoba mengakses halaman operasional/dashboard
-        if (!$hasMasuk && !$isAttendanceRoute) {
-            if (strcasecmp($user->role, 'Admin') === 0) {
-                return redirect()->route('admin.attendance.form')->with('error', 'Otorisasi Kerja: Admin wajib mengisi log presensi masuk sistem.');
-            }
-            return redirect()->route('petugas.attendance.form')->with('error', 'Sistem Terkunci: Petugas lapangan wajib mengisi presensi harian terlebih dahulu.');
-        }
-
-        // KONDISI B: Jika SUDAH lengkap absen (Masuk & Pulang), dilarang kembali ke form absensi
-        if ($hasMasuk && $hasPulang && $isAttendanceRoute) {
-            if (strcasecmp($user->role, 'Admin') === 0) {
-                return redirect()->route('admin.dashboard')->with('info', 'Sesi registrasi presensi Admin hari ini telah selesai.');
-            }
-            return redirect()->route('petugas.dashboard')->with('info', 'Sesi registrasi presensi harian Anda telah terpenuhi.');
-        }
-
+        // Jalankan request ke lapisan proses berikutnya jika seluruh otentikasi identitas valid
         return $next($request);
     }
 }
