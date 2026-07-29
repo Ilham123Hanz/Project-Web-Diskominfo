@@ -19,6 +19,7 @@ class MasterOpd extends Model
      * @var string
      */
     protected $table = 'master_opd';
+    protected $guarded = [];
 
     /**
      * Primary Key tabel (default: id).

@@ -29,6 +29,8 @@ class CheckRole
 
         // 2. PROTEKSI SILANG & STRATIFIKASI ROLE (CROSS-ROLE PROTECTION)
         // Menggunakan perbandingan string case-insensitive yang aman dari manipulasi input character
+        $user = Auth::user();
+
         if (strcasecmp($userRole, trim($role)) !== 0) {
             Log::warning("Akses Ilegal Terblokir: User ID {$user->id} dengan Role '{$userRole}' mencoba mengakses area khusus '{$role}' pada URL: " . $request->fullUrl());
 

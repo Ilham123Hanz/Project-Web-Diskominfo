@@ -184,7 +184,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($logs ?? [] as $log)
+                        @forelse($patrols as $log)
                             @php
                                 $statusBadge = '';
                                 $rowClass = '';

@@ -221,21 +221,26 @@
             <div class="collapse navbar-collapse mt-2 mt-md-0" id="navbarCyberMenu">
                 <!-- Menu Navigasi Utama -->
                 <div class="navbar-nav me-auto ms-md-4 gap-1">
-                    <a href="{{ Route::has('petugas.dashboard') ? route('petugas.dashboard') : '#' }}" 
-                       class="nav-link-cyber {{ request()->routeIs('petugas.dashboard*') ? 'active' : '' }}">
-                        <i class="fas fa-gauge-high"></i> Dashboard & Absensi
-                    </a>
 
-                    <a href="{{ Route::has('petugas.riwayat-log-petugas') ? route('petugas.riwayat-log-petugas') : (Route::has('riwayat-log-petugas') ? route('riwayat-log-petugas') : '#') }}" 
-                       class="nav-link-cyber {{ request()->routeIs('*riwayat-log-petugas*') ? 'active' : '' }}">
-                        <i class="fas fa-list-check"></i> Riwayat Log
-                    </a>
+    <a href="{{ route('petugas.dashboard') }}"
+       class="nav-link-cyber {{ request()->routeIs('petugas.dashboard') ? 'active' : '' }}">
+        <i class="fas fa-gauge-high"></i>
+        Dashboard & Absensi
+    </a>
 
-                    <a href="{{ Route::has('petugas.laporan.create') ? route('petugas.laporan.create') : '#' }}" 
-                       class="nav-link-cyber {{ request()->routeIs('petugas.laporan*') ? 'active' : '' }}">
-                        <i class="fas fa-file-circle-plus"></i> Input Patroli Siber
-                    </a>
-                </div>
+    <a href="{{ route('petugas.patrol.history') }}"
+       class="nav-link-cyber {{ request()->routeIs('petugas.patrol.history') ? 'active' : '' }}">
+        <i class="fas fa-list-check"></i>
+        Riwayat Log
+    </a>
+
+    <a href="{{ route('petugas.patrol.create') }}"
+       class="nav-link-cyber {{ request()->routeIs('petugas.patrol.create') ? 'active' : '' }}">
+        <i class="fas fa-file-circle-plus"></i>
+        Input Patroli Siber
+    </a>
+
+</div>
 
                 <!-- Right System Header Action -->
                 <div class="d-flex align-items-center gap-3 mt-3 mt-md-0">
