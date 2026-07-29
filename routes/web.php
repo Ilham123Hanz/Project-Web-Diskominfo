@@ -1,183 +1,198 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\PresensiController;
-use App\Http\Controllers\Admin\MasterOpdController;
-use App\Http\Controllers\Admin\MasterKategoriController;
+use App\Http\Controllers\MasterOpdController;
+use App\Http\Controllers\Admin\ArchiveFolderController; // <-- 1. IMPORT CONTROLLER ARSIP
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes - Sistem Informasi Pelaporan & Operasional Siber (SIP-O-SIBER)
-| Dinas Komunikasi, Informatika dan Statistik Provinsi Lampung
+| WEB ROUTES SIP-O-SIBER
 |--------------------------------------------------------------------------
 */
 
-// =========================================================================
-// 1. ZONA UMUM / PENGUNJUNG (GUEST ZONES) - DILINDUNGI THROTTLE
-// =========================================================================
-Route::middleware(['guest'])->group(function () {
-    
-    // Gerbang Masuk Otentikasi Terpusat
+/*
+|--------------------------------------------------------------------------
+| GUEST (Belum Login)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('guest')->group(function () {
     Route::get('/', [AuthController::class, 'showLoginForm'])->name('login');
     Route::get('/login', [AuthController::class, 'showLoginForm']);
+
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1')
         ->name('login.post');
 
-    // Alur Registrasi Akun Mandiri Personel Baru
     Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+
     Route::post('/register', [AuthController::class, 'register'])
         ->middleware('throttle:3,1')
         ->name('register.post');
 
-    // Alur Lupa Password / Reset Kredensial Mandiri
     Route::get('/lupa-password', [AuthController::class, 'showForgotPasswordForm'])
         ->name('password.request');
 
     Route::post('/lupa-password', [AuthController::class, 'sendResetLinkEmail'])
-        ->middleware('throttle:3,1')
         ->name('password.email');
-
-    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])
-        ->name('password.reset');
-
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])
-        ->middleware('throttle:5,1')
-        ->name('password.update');
 });
 
-// Sesi Pemutusan Autentikasi (Logout)
-Route::middleware(['auth'])->group(function () {
-    Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->name('logout');
+/*
+|--------------------------------------------------------------------------
+| LOGOUT
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::match(['GET', 'POST'], '/logout', [AuthController::class, 'logout'])
+        ->name('logout');
 });
 
-// =========================================================================
-// 2. ZONA TERPROTEKSI (AUTHENTICATED ZONES)
-// =========================================================================
-Route::middleware(['auth'])->group(function () {
+/*
+|--------------------------------------------------------------------------
+| AUTHENTICATED ROUTES
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | HAK AKSES ROLE: OPERATOR / PETUGAS LAPANGAN
+    | PETUGAS
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['checkRole:Petugas'])->prefix('petugas')->name('petugas.')->group(function () {
-        
-        // Dashboard Utama Petugas Lapangan
-        Route::get('/dashboard', [LaporanController::class, 'index'])->name('dashboard');
+    Route::prefix('petugas')
+        ->middleware('checkRole:Petugas')
+        ->name('petugas.')
+        ->group(function () {
 
-        // Fitur Absensi Mandiri Petugas (Ditambahkan Alias / Route Pendukung)
-        Route::controller(PresensiController::class)->group(function () {
-            Route::get('/absensi-petugas', 'showCheckForm')->name('attendance.form');
-            Route::get('/absensi/form', 'showCheckForm')->name('absensi.form'); // Alias untuk panggilan AJAX modal
-            Route::post('/attendance/store', 'store')->middleware('throttle:10,1')->name('attendance.store');
-            Route::get('/attendance/my-log', 'myAttendanceLog')->name('attendance.log');
-        });
+            Route::get('/dashboard', [LaporanController::class, 'index'])->name('dashboard');
 
-        // Modul Operasional & Laporan Petugas Lapangan
-        Route::controller(LaporanController::class)->group(function () {
-            // Modul Input Log Patroli/Laporan Baru (Alias ditambahkan agar kompatibel)
-            Route::get('/patrol/create', 'create')->name('patrol.create');
-            Route::get('/laporan/create', 'create')->name('laporan.create'); // Alias untuk menu Navbar
-            Route::post('/patrol/store', 'store')->middleware('throttle:10,1')->name('patrol.store');
-            
-            // Modul Revisi & Koreksi Data Insiden Ditolak/Ditangguhkan
-            Route::get('/patrol/{id}/edit', 'edit')->name('patrol.edit')->whereNumber('id');
-            Route::put('/patrol/{id}/update', 'update')->middleware('throttle:10,1')->name('patrol.update')->whereNumber('id');
-            
-            // Modul Trasabilitas Historis Log & Detail Insiden (Alias ditambahkan agar kompatibel)
-            Route::get('/patrol/history', 'history')->name('patrol.history');
-            Route::get('/riwayat-log-petugas', 'history')->name('riwayat-log-petugas'); // Alias untuk menu Navbar
-            Route::get('/patrol/{id}/detail', 'show')->name('patrol.show')->whereNumber('id');
-        });
+            /* Presensi */
+            Route::get('/absensi', [PresensiController::class, 'showCheckForm'])->name('attendance.form');
+            Route::post('/attendance/store', [PresensiController::class, 'store'])->name('attendance.store');
+            Route::get('/attendance/history', [PresensiController::class, 'myAttendanceLog'])->name('attendance.log');
 
-        // Modul Cetak PDF Laporan Petugas
-        Route::controller(LaporanController::class)->prefix('laporan')->name('laporan.')->group(function () {
-            Route::get('/patroli/pdf/{id}', 'cetakPatroliPdf')->name('patroli.pdf')->whereNumber('id');
+            /* Patroli */
+            Route::get('/patrol/create', [LaporanController::class, 'create'])->name('patrol.create');
+            Route::post('/patrol/store', [LaporanController::class, 'store'])->name('patrol.store');
+            Route::get('/patrol/history', [LaporanController::class, 'history'])->name('patrol.history');
+            Route::get('/patrol/{id}', [LaporanController::class, 'show'])->name('patrol.show');
+            Route::get('/patrol/{id}/edit', [LaporanController::class, 'edit'])->name('patrol.edit');
+            Route::put('/patrol/{id}', [LaporanController::class, 'update'])->name('patrol.update');
+            Route::get('/laporan/patroli/pdf/{id}', [LaporanController::class, 'cetakPatroliPdf'])->name('laporan.patroli.pdf');
         });
-    });
 
     /*
     |--------------------------------------------------------------------------
-    | HAK AKSES ROLE: ADMINISTRATOR PUSAT
+    | ADMIN
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['checkRole:Admin'])->prefix('admin')->name('admin.')->group(function () {
-        
-        // Dashboard Utama Administrator Pusat
-        Route::get('/dashboard', [LaporanController::class, 'adminDashboard'])->name('dashboard');
+    Route::prefix('admin')
+        ->middleware('checkRole:Admin')
+        ->name('admin.')
+        ->group(function () {
 
-        // Fitur Absensi Mandiri Administrator
-        Route::controller(PresensiController::class)->group(function () {
-            Route::get('/absensi-admin', 'showCheckForm')->name('attendance.form');
-            Route::post('/attendance/store', 'store')->middleware('throttle:10,1')->name('attendance.store');
-            Route::get('/attendances', 'index')->name('absensi');
+            /* Dashboard & Profil */
+Route::get('/dashboard', [LaporanController::class, 'adminDashboard'])->name('dashboard');
+Route::get('/profil', [LaporanController::class, 'profilAdmin'])->name('profil');
+Route::put('/profil', [LaporanController::class, 'updateProfilAdmin'])->name('profil.update'); // <-- TAMBAHKAN ROUTE INI
+
+            /* Presensi Admin */
+            Route::get('/absensi-admin', [PresensiController::class, 'showCheckForm'])->name('attendance.form');
+            Route::post('/attendance/store', [PresensiController::class, 'store'])->name('attendance.store');
+            Route::get('/attendances', [PresensiController::class, 'index'])->name('attendance.index');
+            Route::get('/attendances/export', [PresensiController::class, 'exportCsv'])->name('attendance.export');
+
+            /* Validasi & Manajemen Patroli */
+            Route::get('/patrols/all', [LaporanController::class, 'allPatrols'])->name('validasi');
+            Route::get('/patrol/{id}', [LaporanController::class, 'show'])->name('patrol.show');
+            Route::post('/patrol/{id}/update-status', [LaporanController::class, 'updateStatus'])->name('patrol.update-status');
+            Route::get('/patrol/{id}/pdf', [LaporanController::class, 'cetakPdf'])->name('patrol.pdf');
+            Route::delete('/patrol/{id}', [LaporanController::class, 'destroy'])->name('patrol.delete');
+
+            /* MANAJEMEN FOLDER VIRTUAL ARSIP */
+Route::prefix('archives/folders')->name('folders.')->group(function () {
+    Route::get('/', [ArchiveFolderController::class, 'index'])->name('index');
+    Route::post('/', [ArchiveFolderController::class, 'store'])->name('store');
+    Route::delete('/{id}', [ArchiveFolderController::class, 'destroy'])->name('destroy');
+});
+// Tambahkan alias untuk kompatibilitas menu sidebar lama:
+Route::get('/admin/archives/folders', [ArchiveFolderController::class, 'index'])->name('admin.archives.folders');
+
+            /* SMTP Settings */
+            Route::get('/smtp', [LaporanController::class, 'showSmtpSettings'])->name('smtp');
+            Route::post('/smtp/distribute/{id}', [LaporanController::class, 'distributeEmail'])->name('patrol.distribute');
+
+            /*
+            |--------------------------------------------------------------------------
+            | MANAJEMEN MASTER OPD (Email, Sosmed, Aplikasi)
+            | Generates: admin.master-opd.*
+            |--------------------------------------------------------------------------
+            */
+            Route::prefix('master-opd')->name('master-opd.')->group(function () {
+
+                // Halaman Utama Tabs (Generates Name: admin.master-opd.index | URL: /admin/master-opd)
+                Route::get('/', [MasterOpdController::class, 'index'])->name('index');
+
+                // Route Email OPD (Generates Name: admin.master-opd.email.*)
+                Route::post('/email/store', [MasterOpdController::class, 'storeEmail'])->name('email.store');
+                Route::put('/email/{id}', [MasterOpdController::class, 'updateEmail'])->name('email.update');
+                Route::delete('/email/{id}', [MasterOpdController::class, 'destroyEmail'])->name('email.destroy');
+                Route::get('/email/export', [MasterOpdController::class, 'exportEmailCsv'])->name('email.export');
+
+                // Route Media Sosial OPD (Generates Name: admin.master-opd.sosmed.*)
+                Route::post('/sosmed/store', [MasterOpdController::class, 'storeSosmed'])->name('sosmed.store');
+                Route::put('/sosmed/{id}', [MasterOpdController::class, 'updateSosmed'])->name('sosmed.update');
+                Route::delete('/sosmed/{id}', [MasterOpdController::class, 'destroySosmed'])->name('sosmed.destroy');
+                Route::get('/sosmed/export', [MasterOpdController::class, 'exportSosmedCsv'])->name('sosmed.export');
+
+                // Route Aplikasi Pemprov (Generates Name: admin.master-opd.aplikasi.*)
+                Route::post('/aplikasi/store', [MasterOpdController::class, 'storeAplikasi'])->name('aplikasi.store');
+                Route::put('/aplikasi/{id}', [MasterOpdController::class, 'updateAplikasi'])->name('aplikasi.update');
+                Route::delete('/aplikasi/{id}', [MasterOpdController::class, 'destroyAplikasi'])->name('aplikasi.destroy');
+                Route::get('/aplikasi/export', [MasterOpdController::class, 'exportAplikasiCsv'])->name('aplikasi.export');
+            });
+
+            /* Rekap Laporan & Presensi */
+            Route::prefix('laporan')->name('laporan.')->group(function () {
+                Route::get('/patroli', [LaporanController::class, 'indexPatroli'])->name('patroli.index');
+                Route::get('/patroli/pdf/{id}', [LaporanController::class, 'cetakPatroliPdf'])->name('patroli.pdf');
+                Route::get('/patroli/excel', [LaporanController::class, 'exportPatroliExcel'])->name('patroli.excel');
+                Route::get('/patroli/rekap-pdf', [LaporanController::class, 'rekapPatroliPdf'])->name('patroli.rekap-pdf');
+
+                Route::get('/presensi', [LaporanController::class, 'indexPresensi'])->name('presensi.index');
+                Route::get('/presensi/excel', [LaporanController::class, 'exportPresensiExcel'])->name('presensi.excel');
+                Route::get('/presensi/rekap-pdf', [LaporanController::class, 'rekapPresensiPdf'])->name('presensi.rekap-pdf');
+            });
+
         });
-
-        // Modul Manajemen, Validasi Matrix & Operasional Admin
-        Route::controller(LaporanController::class)->group(function () {
-            // Manajemen Data & Validasi Status Matrix Laporan
-            Route::get('/patrols/all', 'allPatrols')->name('validasi');
-            Route::post('/patrol/{id}/update-status', 'updateStatus')->name('patrol.update-status')->whereNumber('id');
-            Route::delete('/patrol/{id}/delete', 'destroy')->name('patrol.delete')->whereNumber('id');
-            
-            // Modul Distribusi Notifikasi Elektronik (SMTP)
-            Route::get('/smtp/distribution', 'showSmtpSettings')->name('smtp');
-            Route::post('/patrol/{id}/distribute-email', 'distributeEmail')->middleware('throttle:5,1')->name('patrol.distribute')->whereNumber('id');
-            
-            // Modul Manajerial Folder Virtual & Arsip Berkas
-            Route::get('/archives/folders', 'archiveFolders')->name('folder_virtual');
-        });
-
-        // Modul Pusat Pelaporan, Ekspor Excel & Cetak PDF Rekapitulasi
-        Route::controller(LaporanController::class)->prefix('laporan')->name('laporan.')->group(function () {
-            // Rekap & Ekspor Laporan Patroli
-            Route::get('/patroli', 'indexPatroli')->name('patroli.index');
-            Route::get('/patroli/pdf/{id}', 'cetakPatroliPdf')->name('patroli.pdf')->whereNumber('id');
-            Route::get('/patroli/export-excel', 'exportPatroliExcel')->middleware('throttle:10,1')->name('patroli.excel');
-            Route::get('/patroli/rekap-pdf', 'rekapPatroliPdf')->middleware('throttle:10,1')->name('patroli.rekap-pdf');
-
-            // Rekap & Ekspor Laporan Presensi Personel
-            Route::get('/presensi', 'indexPresensi')->name('presensi.index');
-            Route::get('/presensi/export-excel', 'exportPresensiExcel')->middleware('throttle:10,1')->name('presensi.excel');
-            Route::get('/presensi/rekap-pdf', 'rekapPresensiPdf')->middleware('throttle:10,1')->name('presensi.rekap-pdf');
-        });
-        
-        // Modul Manajemen Master Data Klaster (Resource Routes)
-        Route::resources([
-            'master-opd'      => MasterOpdController::class,
-            'master-kategori' => MasterKategoriController::class,
-        ]);
-    });
 
     /*
     |--------------------------------------------------------------------------
-    | INTELLIGENT FALLBACK REDIRECTOR
+    | HOME DIRECT
     |--------------------------------------------------------------------------
     */
     Route::get('/home', function () {
-        $user = auth()->user();
-        if ($user && strcasecmp($user->role, 'Admin') === 0) {
-            return redirect()->route('admin.dashboard');
-        }
-        return redirect()->route('petugas.dashboard');
+        return strcasecmp(auth()->user()->role, 'Admin') === 0
+            ? redirect()->route('admin.dashboard')
+            : redirect()->route('petugas.dashboard');
     })->name('home');
+
 });
 
-// =========================================================================
-// 3. ZONA PROTEKSI FALLBACK GLOBAL (404 SAFETY NET)
-// =========================================================================
+/*
+|--------------------------------------------------------------------------
+| FALLBACK
+|--------------------------------------------------------------------------
+*/
 Route::fallback(function () {
     if (auth()->check()) {
-        $user = auth()->user();
-        $targetRoute = (strcasecmp($user->role, 'Admin') === 0) ? 'admin.dashboard' : 'petugas.dashboard';
-
-        return redirect()->route($targetRoute)
-            ->with('error', 'Enkripsi Peringatan: Jalur URL yang Anda tuju tidak ditemukan dalam repositori sistem.');
+        return strcasecmp(auth()->user()->role, 'Admin') === 0
+            ? redirect()->route('admin.dashboard')
+            : redirect()->route('petugas.dashboard');
     }
 
-    return redirect()->route('login')
-        ->with('error', 'Akses Ditolak: Silakan autentikasi kredensial Anda untuk mengakses modul SIP-O-SIBER.');
+    return redirect()->route('login');
 });

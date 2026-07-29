@@ -125,7 +125,7 @@
     <div class="p-3 bg-white border rounded-3 mb-4 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div class="d-flex align-items-center">
             <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3 text-primary d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
-                <i class="fas fa-user-shield fa-a-lg"></i>
+                <i class="fas fa-user-shield"></i>
             </div>
             <div>
                 <div class="d-flex align-items-center gap-2">
@@ -522,26 +522,20 @@
 
 @push('scripts')
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // Bootstrap Tooltip Initialization
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-
-        // Realtime Clock Display Update
-        function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const clockElement = document.getElementById('liveDigitalClock');
-            if (clockElement) {
-                clockElement.textContent = `${hours}:${minutes}:${seconds} WIB`;
-            }
+document.addEventListener("DOMContentLoaded", function() {
+    // Jam Digital Real-time sederhana
+    function updateClock() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const clockElement = document.getElementById('liveDigitalClock');
+        if (clockElement) {
+            clockElement.textContent = `${hours}:${minutes}:${seconds} WIB`;
         }
-        setInterval(updateClock, 1000);
-        updateClock();
-    });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+});
 </script>
 @endpush

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Laporan;
 use App\Models\Presensi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ class LaporanController extends Controller
                 });
             }
 
-            // Hitung Metriks Ringkasan Kinerja Secara Agregat (Bukan Hanya Per Halaman Pagination)
+            // Hitung Metriks Ringkasan Kinerja Secara Agregat
             $totalPatrols  = (clone $baseQuery)->count();
             $totalVerified = (clone $baseQuery)->whereIn('status', ['Verified', 'Approved', 'Disetujui Admin'])->count();
             $totalPending  = (clone $baseQuery)->whereIn('status', ['Pending', 'Menunggu Validasi'])->count();
@@ -182,7 +183,7 @@ class LaporanController extends Controller
     }
 
     /**
-     * Menyimpan Data Laporan Patroli Baru (Atomic Transaction & Secure File Storage).
+     * Menyimpan Data Laporan Patroli Baru.
      * Route: petugas.laporan.store
      */
     public function store(Request $request) 
@@ -281,10 +282,15 @@ class LaporanController extends Controller
                 ->with('error', 'Terjadi kesalahan sistem saat menyimpan laporan: ' . $e->getMessage());
         }
     }
+    
+    public function indexPresensi()
+    {
+        return view('admin.absensi');
+    }
 
     /**
      * Tampilan Riwayat Laporan Petugas secara Lengkap.
-     * Route: petugas.laporan.history
+     * Route: petugas.patrol.history
      */
     public function history(Request $request)
     {
@@ -331,15 +337,14 @@ class LaporanController extends Controller
     public function show($id)
     {
         try {
-            $patrol = Laporan::with(['user', 'presensi'])
+            $laporan = Laporan::with(['user', 'presensi'])
                 ->where('user_id', Auth::id())
                 ->findOrFail($id);
 
-            return view('petugas.detail-patroli', compact('patrol'));
+            return view('admin.patroli-detail', compact('laporan'));
 
-        } catch (Exception $e) {
-            Log::warning("Akses ilegal atau Laporan ID {$id} tidak ditemukan untuk User " . Auth::id());
-            return redirect()->route('petugas.laporan.history')->with('error', 'Laporan tidak ditemukan atau Anda tidak memiliki hak akses.');
+        } catch (\Exception $e) {
+            return redirect()->route('admin.validasi')->with('error', 'Data laporan tidak ditemukan.');
         }
     }
 
@@ -354,7 +359,7 @@ class LaporanController extends Controller
 
             // Hak Edit Hanya untuk Laporan Berstatus Perbaikan/Penolakan
             if (!in_array($patrol->status, ['Perlu Perbaikan', 'Revision', 'Rejection'])) {
-                return redirect()->route('petugas.laporan.history')
+                return redirect()->route('petugas.patrol.history')
                     ->with('error', 'Akses Ditolak: Laporan ini berstatus terkunci atau sedang diproses admin.');
             }
 
@@ -378,7 +383,7 @@ class LaporanController extends Controller
             return view('petugas.edit-patroli', compact('patrol', 'listOPD', 'listKategori'));
 
         } catch (Exception $e) {
-            return redirect()->route('petugas.laporan.history')->with('error', 'Gagal memuat data laporan untuk direvisi.');
+            return redirect()->route('petugas.patrol.history')->with('error', 'Gagal memuat data laporan untuk direvisi.');
         }
     }
 
@@ -391,7 +396,7 @@ class LaporanController extends Controller
         $patrol = Laporan::where('user_id', Auth::id())->findOrFail($id);
 
         if (!in_array($patrol->status, ['Perlu Perbaikan', 'Revision', 'Rejection'])) {
-            return redirect()->route('petugas.laporan.history')
+            return redirect()->route('petugas.patrol.history')
                 ->with('error', 'Akses Ditolak: Laporan ini sudah tidak dapat diubah.');
         }
 
@@ -417,7 +422,7 @@ class LaporanController extends Controller
                     return redirect()->back()->withErrors(['evidence' => 'Format file yang diunggah tidak diizinkan.']);
                 }
 
-                // Hapus Berkas Bukti Lama dari Disk Storage
+                // Hapus Berkas Bukti Lama
                 if ($patrol->file_evidence) {
                     $oldCategory = preg_replace('/[^A-Za-z0-9_\-]/', '_', $patrol->kategori_insiden);
                     $oldPath = "public/bukti_files/{$patrol->created_at->year}/{$oldCategory}/{$patrol->file_evidence}";
@@ -449,7 +454,7 @@ class LaporanController extends Controller
             DB::commit();
             Log::info("Revisi Laporan ID {$id} [{$patrol->log_code}] berhasil dikirim ulang oleh User " . Auth::id());
 
-            return redirect()->route('petugas.laporan.history')
+            return redirect()->route('petugas.patrol.history')
                 ->with('success', 'Laporan #' . $patrol->log_code . ' telah berhasil diperbarui dan dikirim kembali untuk diverifikasi.');
 
         } catch (Exception $e) {
@@ -467,65 +472,58 @@ class LaporanController extends Controller
      */
 
     /**
-     * Dashboard Utama Administrator Pusat (Ringkasan Analitik & Grafis).
+     * Dashboard Utama Administrator Pusat.
      * Route: admin.dashboard
      */
     public function adminDashboard(Request $request) 
     {
-        try {
-            $search    = trim($request->input('search'));
-            $sortBy    = $request->input('sort_by', 'created_at');
-            $sortOrder = $request->input('sort_order', 'desc');
-
+      try {
             $currentYear = Carbon::now('Asia/Jakarta')->year;
-            
-            // Rekap Statistik Tren Bulanan untuk Visualisasi Chart
-            $chartData = Laporan::select(
-                    DB::raw('MONTH(created_at) as month'),
-                    DB::raw('count(*) as total')
-                )
-                ->whereYear('created_at', $currentYear)
-                ->groupBy('month')
-                ->orderBy('month', 'asc')
-                ->get()
-                ->map(fn($item) => ['month' => (int) $item->month, 'total' => (int) $item->total])
-                ->toArray();
 
-            // Total Metriks Insiden
-            $totalInsiden    = Laporan::count();
-            $totalJudol      = Laporan::where('kategori_insiden', 'LIKE', '%Judi Online%')->count();
-            $totalDefacement = Laporan::where('kategori_insiden', 'LIKE', '%Defacement%')->count();
-            $totalMalware    = Laporan::where('kategori_insiden', 'LIKE', '%Malware%')->count();
+            $laporans = Laporan::whereYear('created_at', $currentYear)->get();
 
-            // Optimasi Eager Loading Relasi User
-            $query = Laporan::with(['user']);
-            
-            if (!empty($search)) {
-                $query->where(function($q) use ($search) {
-                    $q->where('opd_sasaran', 'like', "%{$search}%")
-                      ->orWhere('kategori_insiden', 'like', "%{$search}%")
-                      ->orWhere('log_code', 'like', "%{$search}%")
-                      ->orWhereHas('user', function($u) use ($search) {
-                          $u->where('name', 'like', "%{$search}%")
-                            ->orWhere('username', 'like', "%{$search}%");
-                      });
-                });
+            $chartDataRaw = array_fill(1, 12, 0);
+            foreach ($laporans as $laporan) {
+                $bulan = (int) Carbon::parse($laporan->created_at)->format('n');
+                if (isset($chartDataRaw[$bulan])) {
+                    $chartDataRaw[$bulan]++;  
+                }
             }
 
-            $allowedSort = ['created_at', 'opd_sasaran', 'kategori_insiden', 'status'];
-            $sortBy      = in_array($sortBy, $allowedSort) ? $sortBy : 'created_at';
-            $sortOrder   = in_array(strtolower($sortOrder), ['asc', 'desc']) ? $sortOrder : 'desc';
+            $chartData = array_values($chartDataRaw);
 
-            $patrols = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
+            $totalInsiden    = Laporan::count();
+            $totalJudol      = Laporan::where('kategori_insiden', 'LIKE', '%judi%')
+                                       ->orWhere('kategori_insiden', 'LIKE', '%judol%')
+                                       ->orWhere('main_menu', 'LIKE', '%judi%')
+                                       ->count();
+
+            $totalDefacement = Laporan::where('kategori_insiden', 'LIKE', '%defacement%')
+                                       ->orWhere('kategori_insiden', 'LIKE', '%web%')
+                                       ->orWhere('main_menu', 'LIKE', '%defacement%')
+                                       ->count();
+
+            $totalMalware    = Laporan::where('kategori_insiden', 'LIKE', '%malware%')
+                                       ->orWhere('kategori_insiden', 'LIKE', '%injection%')
+                                       ->orWhere('main_menu', 'LIKE', '%malware%')
+                                       ->count();
+
+            $patrols = Laporan::with('user')->latest()->take(5)->get();
 
             return view('admin.dashboard', compact(
-                'patrols', 'chartData', 'totalInsiden', 
-                'totalJudol', 'totalDefacement', 'totalMalware'
+                'patrols', 
+                'chartData', 
+                'totalInsiden', 
+                'totalJudol', 
+                'totalDefacement', 
+                'totalMalware'
             ));
 
-        } catch (Exception $e) {
-            Log::error('Gagal memuat Dashboard Admin: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal memuat dashboard administrator.');
+        } catch (\Exception $e) {
+            Log::error('Gagal memuat Dashboard Admin: ' . $e->getMessage(), [
+                'line' => $e->getLine()
+            ]);
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat memuat data dashboard.');
         }
     }
 
@@ -556,54 +554,42 @@ class LaporanController extends Controller
             return view('admin.validasi-patroli', compact('patrols'));
 
         } catch (Exception $e) {
-            Log::error('Gagal memuat daftar validasi patroli: ' . $e->getMessage());
+            Log::error('Gagal memuat daftar validasi patroli: '.$e->getMessage());
+
             return redirect()->back()->with('error', 'Gagal memuat modul validasi patroli.');
         }
     }
 
     /**
-     * Mengubah Status Validasi & Menambahkan Catatan Perbaikan Admin.
+     * Memperbarui status laporan.
      * Route: admin.patrol.update-status
      */
-    public function updateStatus(Request $request, $id) 
+    public function updateStatus(Request $request, $id)
     {
-        $validator = Validator::make($request->all(), [
-            'status'           => 'required|in:Pending,Perlu Perbaikan,Revision,Rejection,Verified,Approved',
-            'admin_correction' => 'required_if:status,Perlu Perbaikan,Revision,Rejection|nullable|string|max:1000'
+        $request->validate([
+            'status'           => 'required|in:Pending,Verified,Perlu Perbaikan,Rejected',
+            'admin_correction' => 'nullable|string|max:1000',
+            'catatan_revisi'   => 'nullable|string|max:1000',
         ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->with('error', 'Gagal memperbarui status: Catatan wajib diisi jika laporan ditolak/diperlukan perbaikan.');
-        }
-
         try {
-            $patrol = Laporan::findOrFail($id);
-            
-            $targetStatus = $request->status;
+            $laporan = Laporan::findOrFail($id);
+            $laporan->status = $request->status;
 
-            // Normalisasi Penamaan Status
-            if ($targetStatus === 'Approved') { $targetStatus = 'Verified'; }
-            if (in_array($targetStatus, ['Rejection', 'Revision'])) { $targetStatus = 'Perlu Perbaikan'; }
+            $correctionNote = $request->admin_correction ?? $request->catatan_revisi;
 
-            $patrol->status           = $targetStatus;
-            $patrol->admin_correction = ($targetStatus === 'Perlu Perbaikan') ? strip_tags($request->admin_correction) : null;
-            
-            if ($targetStatus === 'Verified') {
-                $patrol->verified_by = Auth::id();
-                $patrol->verified_at = Carbon::now('Asia/Jakarta');
-            } else {
-                $patrol->verified_by = null;
-                $patrol->verified_at = null;
+            if ($request->status === 'Perlu Perbaikan' || !empty($correctionNote)) {
+                $laporan->admin_correction = $correctionNote;
+            } elseif ($request->status === 'Verified') {
+                $laporan->admin_correction = null;
             }
 
-            $patrol->save();
+            $laporan->save();
 
-            Log::info("Status Laporan ID {$id} diperbarui menjadi '{$targetStatus}' oleh Admin ID " . Auth::id());
+            return redirect()->back()->with('success', 'Status laporan #' . $laporan->log_code . ' berhasil diperbarui.');
 
-            return redirect()->back()->with('success', 'Status validasi laporan #' . $patrol->log_code . ' berhasil diperbarui.');
-
-        } catch (Exception $e) {
-            Log::error("Gagal mengupdate status Laporan ID {$id}: " . $e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Gagal Update Status: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal memperbarui status laporan.');
         }
     }
@@ -618,7 +604,6 @@ class LaporanController extends Controller
         try {
             $patrol = Laporan::findOrFail($id);
             
-            // Hapus Bukti Fisik di Storage Disk
             if ($patrol->file_evidence) {
                 $cleanCategory = preg_replace('/[^A-Za-z0-9_\-]/', '_', $patrol->kategori_insiden);
                 $fullPath      = "public/bukti_files/{$patrol->created_at->year}/{$cleanCategory}/{$patrol->file_evidence}";
@@ -643,16 +628,16 @@ class LaporanController extends Controller
     }
 
     /**
-     * Menampilkan Konfigurasi Distribusi SMTP Email.
+     * Menampilkan Konfigurasi SMTP Email.
      * Route: admin.smtp
      */
     public function showSmtpSettings()
     {
-        return view('admin.smtp-settings');
+        return view('admin.smtp');
     }
 
     /**
-     * Distribusi Notifikasi Laporan via SMTP Email (Mock Dispatcher).
+     * Distribusi Notifikasi Laporan via SMTP Email.
      * Route: admin.patrol.distribute
      */
     public function distributeEmail(Request $request, $id)
@@ -669,7 +654,16 @@ class LaporanController extends Controller
     }
 
     /**
-     * Menampilkan Tampilan Arsip Virtual Berdasarkan Pengelompokan Tahun.
+     * Menampilkan Master Data OPD.
+     * Route: admin.master-opd.index
+     */
+    public function masterOpd()
+    {
+        return view('admin.master-opd');
+    }
+
+    /**
+     * Tampilan Arsip Virtual Berdasarkan Pengelompokan Tahun.
      * Route: admin.folder_virtual
      */
     public function archiveFolders()
@@ -681,7 +675,7 @@ class LaporanController extends Controller
                 ->orderBy('year', 'desc')
                 ->pluck('year');
 
-            return view('admin.virtual-folders', compact('folders'));
+            return view('admin.folder-virtual', compact('folders'));
 
         } catch (Exception $e) {
             Log::error('Gagal memuat arsip folder virtual: ' . $e->getMessage());
@@ -689,6 +683,43 @@ class LaporanController extends Controller
         }
     }
 
+    /**
+     * Menampilkan Halaman Profil Admin.
+     * Route: admin.profil
+     */
+    public function profilAdmin()
+    {
+        $user = auth()->user();
+        return view('admin.profil', compact('user'));
+    }
+
+    /**
+     * Update Profil Admin
+     * Route: admin.profil.update
+     */
+    public function updateProfilAdmin(Request $request)
+{
+    $user = auth()->user();
+
+    $request->validate([
+        'name'     => 'required|string|max:255',
+        'email'    => 'required|email|unique:users,email,' . $user->id,
+        'password' => 'nullable|min:8|confirmed',
+    ]);
+
+    $user->name  = $request->name;
+    $user->email = $request->email;
+    
+    // Baris $user->no_hp dan $user->alamat dihapus agar tidak error lagi
+
+    if ($request->filled('password')) {
+        $user->password = Hash::make($request->password);
+    }
+
+    $user->save();
+
+    return redirect()->back()->with('success', 'Profil Admin berhasil diperbarui!');
+}
 
     /**
      * =========================================================================
@@ -712,9 +743,8 @@ class LaporanController extends Controller
             $patrols = $query->orderBy('created_at', 'desc')->paginate(20)->withQueryString();
 
             return view('admin.laporan.patroli-index', compact('patrols'));
-
-        } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Gagal memuat rekapitulasi laporan patroli.');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memuat data: ' . $e->getMessage());
         }
     }
 
@@ -722,19 +752,16 @@ class LaporanController extends Controller
      * Cetak Lembar Dokumen PDF Laporan Patroli Tunggal.
      * Route: petugas.laporan.patroli.pdf & admin.laporan.patroli.pdf
      */
-    public function cetakPatroliPdf($id)
+    public function cetakPdf($id)
     {
         try {
-            $patrol = Laporan::with(['user', 'presensi'])->findOrFail($id);
+            $laporan = Laporan::with('user')->findOrFail($id);
 
-            // Hak Akses Restriksi untuk Petugas
-            if (Auth::user()->role === 'Petugas' && $patrol->user_id !== Auth::id()) {
-                abort(403, 'Akses Ditolak: Anda tidak memiliki wewenang untuk mencetak dokumen laporan ini.');
-            }
+            $pdf = \PDF::loadView('pdf.patroli-detail', compact('laporan'));
+            return $pdf->stream('laporan-patroli-' . $laporan->log_code . '.pdf');
 
-            return view('pdf.patroli-single', compact('patrol'));
-
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
+            Log::error('Gagal Cetak PDF: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal mengunduh cetakan PDF laporan.');
         }
     }
@@ -743,64 +770,60 @@ class LaporanController extends Controller
      * Ekspor Data Rekapitulasi Patroli ke Format CSV / Excel.
      * Route: admin.laporan.patroli.excel
      */
-    public function exportPatroliExcel()
+    public function exportPatroliExcel(Request $request)
     {
         try {
-            $fileName = 'rekap-patroli-siber-' . Carbon::now()->format('Y-m-d_H-i-s') . '.csv';
+            $fileName = 'rekap-patroli-' . date('Y-m-d_H-i-s') . '.csv';
 
-            return response()->streamDownload(function() {
+            $query = Laporan::with('user');
+
+            if ($request->filled('start_date') && $request->filled('end_date')) {
+                $query->whereBetween('created_at', [
+                    $request->start_date . ' 00:00:00', 
+                    $request->end_date . ' 23:59:59'
+                ]);
+            }
+
+            return response()->streamDownload(function () use ($query) {
                 $handle = fopen('php://output', 'w');
-                // Menambahkan UTF-8 BOM
-                fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+                
+                // Tambahkan BOM untuk Excel agar format UTF-8 terbaca presisi
+                fwrite($handle, "\xEF\xBB\xBF");
 
                 // Header Kolom CSV
-                fputcsv($handle, ['ID Log', 'Petugas', 'OPD Sasaran', 'Kategori Insiden', 'Target URL', 'Status', 'Tanggal Laporan']);
+                fputcsv($handle, [
+                    'Log Code', 
+                    'Petugas', 
+                    'OPD/Sasaran', 
+                    'Kategori Insiden',
+                    'URL Target',
+                    'Status',
+                    'Tanggal Dibuat'
+                ]);
 
-                Laporan::with('user')->chunk(200, function($laporanChunk) use ($handle) {
-                    foreach ($laporanChunk as $row) {
+                $query->chunk(100, function ($laporans) use ($handle) {
+                    foreach ($laporans as $laporan) {
                         fputcsv($handle, [
-                            $row->log_code,
-                            $row->user->name ?? 'N/A',
-                            $row->opd_sasaran,
-                            $row->kategori_insiden,
-                            $row->target_url,
-                            $row->status,
-                            Carbon::parse($row->created_at)->format('Y-m-d H:i:s')
+                            $laporan->log_code,
+                            $laporan->user->name ?? '-',
+                            $laporan->opd_sasaran,
+                            $laporan->kategori_insiden,
+                            $laporan->target_url,
+                            $laporan->status,
+                            $laporan->created_at ? $laporan->created_at->format('Y-m-d H:i:s') : '-'
                         ]);
                     }
                 });
 
                 fclose($handle);
             }, $fileName, [
-                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Type' => 'text/csv',
                 'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
             ]);
 
-        } catch (Exception $e) {
-            Log::error('Gagal Ekspor Excel Patroli: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal mengekspor data ke format Excel.');
-        }
-    }
-
-    /**
-     * Cetak PDF Rekapitulasi Banyak Laporan Patroli.
-     * Route: admin.laporan.patroli.rekap-pdf
-     */
-    public function rekapPatroliPdf(Request $request)
-    {
-        try {
-            $query = Laporan::with('user');
-
-            if ($request->filled('start_date') && $request->filled('end_date')) {
-                $query->whereBetween('created_at', [$request->start_date . ' 00:00:00', $request->end_date . ' 23:59:59']);
-            }
-
-            $patrols = $query->orderBy('created_at', 'desc')->get();
-
-            return view('pdf.patroli-rekap', compact('patrols'));
-
-        } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Gagal mencetak rekap PDF.');
+        } catch (\Exception $e) {
+            Log::error('Gagal Ekspor Excel: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal mengekspor data.');
         }
     }
 }

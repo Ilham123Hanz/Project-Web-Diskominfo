@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Attendance;
+use App\Models\Presensi as Attendance;
 use App\Models\User;
 use Carbon\Carbon;
 

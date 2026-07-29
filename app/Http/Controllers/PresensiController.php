@@ -38,8 +38,12 @@ class PresensiController extends Controller
                 });
             }
 
-            // 2. Filter Rentang Tanggal Spesifik
-            if ($request->filled('start_date') && $request->filled('end_date')) {
+            // 2. Filter Tanggal Spesifik (Mendukung parameter 'date' dari form/picker UI Admin)
+            if ($request->filled('date')) {
+                $query->whereDate('tanggal_presensi', $request->date);
+            } 
+            // Filter Rentang Tanggal Spesifik
+            elseif ($request->filled('start_date') && $request->filled('end_date')) {
                 $query->whereBetween('tanggal_presensi', [$request->start_date, $request->end_date]);
             } elseif ($request->filled('start_date')) {
                 $query->where('tanggal_presensi', '>=', $request->start_date);
@@ -62,9 +66,9 @@ class PresensiController extends Controller
             ];
 
             // Eksekusi Paginasi dengan mempertahankan Query String Filter di URL
-            $presensiList = $query->paginate(15)->withQueryString();
+            $attendances = $query->paginate(15)->withQueryString();
 
-            return view('admin.check-attendance', compact('presensiList', 'summaryStats'));
+            return view('admin.absensi', compact('attendances', 'summaryStats'));
 
         } catch (Exception $e) {
             Log::error('Gagal memuat rekap presensi di panel admin: ' . $e->getMessage(), [
@@ -73,6 +77,65 @@ class PresensiController extends Controller
             ]);
             return redirect()->back()->with('error', 'Sistem gagal memuat data rekap presensi.');
         }
+    }
+    
+   public function exportCsv(Request $request)
+    {
+        $query = Presensi::with('user')->orderBy('tanggal_presensi', 'desc');
+
+        // Menangkap parameter filter tanggal atau bulan
+        $filterTanggal = $request->input('date') ?? $request->input('tanggal') ?? $request->input('start_date');
+        $filterBulan   = $request->input('month') ?? $request->input('bulan');
+        $filterTahun   = $request->input('year') ?? $request->input('tahun') ?? date('Y');
+
+        if (!empty($filterTanggal)) {
+            $query->whereDate('tanggal_presensi', $filterTanggal);
+            $fileName = 'rekap-absensi-tanggal-' . $filterTanggal . '.csv';
+        } elseif (!empty($filterBulan)) {
+            $query->whereMonth('tanggal_presensi', $filterBulan)
+                  ->whereYear('tanggal_presensi', $filterTahun);
+            $fileName = 'rekap-absensi-bulan-' . $filterBulan . '-' . $filterTahun . '.csv';
+        } else {
+            $fileName = 'rekap-absensi-semua.csv';
+        }
+
+        if ($request->filled('status_kehadiran')) {
+            $query->where('status_kehadiran', $request->status_kehadiran);
+        }
+
+        $attendances = $query->get();
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $callback = function() use ($attendances) {
+            $file = fopen('php://output', 'w');
+            
+            // Menggunakan titik koma (;) agar otomatis terpisah ke kolom-kolom Excel
+            fputcsv($file, ['NO', 'NAMA PETUGAS PATROLI', 'SHIFT PENUGASAN', 'TANGGAL PRESENSI', 'WAKTU KEHADIRAN', 'STATUS KEHADIRAN'], ';');
+
+            foreach ($attendances as $index => $item) {
+                $tanggalFormat = $item->tanggal_presensi ? Carbon::parse($item->tanggal_presensi)->format('d-m-Y') : '-';
+
+                fputcsv($file, [
+                    $index + 1,
+                    $item->user->name ?? '-',
+                    $item->shift ?? 'Shift Pagi',
+                    $tanggalFormat,
+                    $item->jam_masuk ? $item->jam_masuk . ' WIB' : '-',
+                    $item->status_kehadiran ?? 'Hadir'
+                ], ';');
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     /**
@@ -83,7 +146,6 @@ class PresensiController extends Controller
 
     /**
      * Menampilkan Halaman Form Pengisian Presensi.
-     * Dilengkapi Multi-Check View Fallback & Routing Dinamis Berdasarkan Role.
      */
     public function showCheckForm()
     {
@@ -96,7 +158,6 @@ class PresensiController extends Controller
 
             $today = Carbon::today('Asia/Jakarta')->toDateString();
 
-            // Mengambil record presensi user hari ini
             $presensiHariIni = Presensi::where('user_id', $user->id)
                 ->where('tanggal_presensi', $today)
                 ->first();
@@ -111,7 +172,6 @@ class PresensiController extends Controller
 
             $userRole = strtolower($user->role ?? 'petugas');
 
-            // View Redirection Bertingkat Fail-Safe
             if (in_array($userRole, ['admin', 'superadmin']) && view()->exists('admin.check-attendance')) {
                 return view('admin.check-attendance', compact('hasMasuk', 'hasPulang', 'presensiHariIni'));
             }
@@ -128,7 +188,6 @@ class PresensiController extends Controller
                 return view('petugas.absensi-petugas', compact('hasMasuk', 'hasPulang', 'presensiHariIni'));
             }
 
-            // Fallback Redirection Berdasarkan Role User
             $fallbackRoute = in_array($userRole, ['admin', 'superadmin']) ? 'admin.dashboard' : 'petugas.dashboard';
 
             return redirect()->route($fallbackRoute)
@@ -142,7 +201,6 @@ class PresensiController extends Controller
 
             $userRole = strtolower(Auth::user()->role ?? 'petugas');
             $fallbackRoute = in_array($userRole, ['admin', 'superadmin']) ? 'admin.dashboard' : 'petugas.dashboard';
-
             $debugMsg = config('app.debug') ? ' Error detail: ' . $e->getMessage() : '';
 
             return redirect()->route($fallbackRoute)->with('error', 'Terjadi kesalahan sistem saat memuat formulir presensi.' . $debugMsg);
@@ -150,8 +208,7 @@ class PresensiController extends Controller
     }
 
     /**
-     * Memproses Eksekusi Presensi Harian (Clock In / Jam Masuk ATAU Clock Out / Jam Pulang).
-     * Terproteksi Database Transaction (Pessimistic Locking) & Dual Response Handler (HTML/JSON AJAX).
+     * Memproses Eksekusi Presensi Harian (Clock In / Clock Out).
      */
     public function store(Request $request) 
     {
@@ -160,18 +217,14 @@ class PresensiController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        $todayDate = Carbon::today('Asia/Jakarta')->toDateString(); // YYYY-MM-DD Murni
+        $todayDate = Carbon::today('Asia/Jakarta')->toDateString();
 
-        // ---------------------------------------------------------------------
-        // MULTI-FALLBACK AUTO DETECTION UNTUK FIELD ATTENDANCE_INFO & NOTES
-        // ---------------------------------------------------------------------
         $attendanceInfo = $request->input('attendance_info') 
             ?? $request->input('action_type') 
             ?? $request->input('status') 
             ?? $request->input('type') 
             ?? $request->input('mode');
 
-        // Otomatisasi deteksi alur presensi jika parameter kosong
         if (empty($attendanceInfo)) {
             $existingToday = Presensi::where('user_id', $user->id)
                 ->where('tanggal_presensi', $todayDate)
@@ -186,7 +239,6 @@ class PresensiController extends Controller
             $request->merge(['attendance_info' => $attendanceInfo]);
         }
 
-        // Konsistensi Format Nilai ('Masuk' atau 'Pulang')
         $attendanceInfo = ucfirst(strtolower($attendanceInfo));
         if (in_array($attendanceInfo, ['Clockin', 'Clock_in', 'In', 'Masuk'])) {
             $attendanceInfo = 'Masuk';
@@ -195,7 +247,6 @@ class PresensiController extends Controller
         }
         $request->merge(['attendance_info' => $attendanceInfo]);
 
-        // Sanitasi Catatan / Notes
         $notes = $request->input('notes') 
             ?? $request->input('catatan') 
             ?? $request->input('keterangan') 
@@ -204,7 +255,6 @@ class PresensiController extends Controller
             ?? '';
         $cleanNotes = strip_tags(trim($notes));
 
-        // 1. Validasi Input Form
         $validator = Validator::make($request->all(), [
             'attendance_info' => 'required|in:Masuk,Pulang',
             'manual_time'     => 'nullable|string', 
@@ -233,18 +283,15 @@ class PresensiController extends Controller
         $userRole = strtolower($user->role ?? 'petugas');
         $targetDashboard = in_array($userRole, ['admin', 'superadmin']) ? 'admin.dashboard' : 'petugas.dashboard';
 
-        // 2. PARSING & SANITASI WAKTU LOKAL (Pencegahan Bug Double Time Specification)
         try {
             $rawManualTime = $request->input('manual_time');
 
             if (!empty($rawManualTime)) {
-                // Ekstrak bagian jam jika mengandung pemisah '|' atau 'WIB'
                 if (strpos($rawManualTime, '|') !== false) {
                     $rawManualTime = explode('|', $rawManualTime)[1] ?? $rawManualTime;
                 }
                 $cleanTime = trim(str_replace(['WIB', 'wib', 'PM', 'AM'], '', $rawManualTime));
 
-                // Normalisasi format HH:mm ke HH:mm:ss
                 $timeParts = explode(':', $cleanTime);
                 $hour   = str_pad($timeParts[0] ?? '00', 2, '0', STR_PAD_LEFT);
                 $minute = str_pad($timeParts[1] ?? '00', 2, '0', STR_PAD_LEFT);
@@ -255,7 +302,6 @@ class PresensiController extends Controller
                 $timeString = Carbon::now('Asia/Jakarta')->format('H:i:s');
             }
 
-            // Memastikan penentuan objek Carbon hanya menggunakan Tanggal Murni + Jam Murni
             $targetDateTime = Carbon::parse("{$todayDate} {$timeString}", 'Asia/Jakarta');
 
         } catch (Exception $e) {
@@ -263,12 +309,10 @@ class PresensiController extends Controller
             $timeString = $targetDateTime->format('H:i:s');
         }
 
-        // Ambil IP Address (Support Reverse Proxy / Cloudflare)
         $clientIp = $request->header('X-Forwarded-For') 
             ? trim(explode(',', $request->header('X-Forwarded-For'))[0]) 
             : $request->ip();
 
-        // 3. DATABASE TRANSACTION (Pessimistic Locking / Lock For Update)
         DB::beginTransaction();
         try {
             $presensi = Presensi::where('user_id', $user->id)
@@ -276,9 +320,7 @@ class PresensiController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            // =========================================================================
-            // ACTION A: PROSES PRESENSI MASUK (CLOCK IN)
-            // =========================================================================
+            // ACTION A: PROSES PRESENSI MASUK
             if ($attendanceInfo === 'Masuk') {
                 if ($presensi && $presensi->jam_masuk) {
                     DB::rollBack();
@@ -289,7 +331,6 @@ class PresensiController extends Controller
                         : redirect()->route($targetDashboard)->with('error', $msg);
                 }
 
-                // Kalkulasi Keterlambatan Kedatangan
                 $statusMasuk = method_exists(Presensi::class, 'checkIsLate') 
                     ? Presensi::checkIsLate($timeString) 
                     : ($timeString > '08:00:00' ? 'Terlambat' : 'Tepat Waktu');
@@ -316,9 +357,7 @@ class PresensiController extends Controller
                     : redirect()->route($targetDashboard)->with('success', $successMsg);
             }
 
-            // =========================================================================
-            // ACTION B: PROSES PRESENSI PULANG (CLOCK OUT)
-            // =========================================================================
+            // ACTION B: PROSES PRESENSI PULANG
             if ($attendanceInfo === 'Pulang') {
                 if (!$presensi || !$presensi->jam_masuk) {
                     DB::rollBack();
@@ -338,25 +377,18 @@ class PresensiController extends Controller
                         : redirect()->route($targetDashboard)->with('error', $msg);
                 }
 
-                // Kalkulasi Ketepatan Pulang
                 $statusPulang = method_exists(Presensi::class, 'checkIsEarlyLeave') 
                     ? Presensi::checkIsEarlyLeave($timeString) 
                     : ($timeString < '17:00:00' ? 'Pulang Cepat' : 'Tepat Waktu');
 
-                // PERBAIKAN BUG AMBIGU PARSING TANGGAL/JAM:
-                // Ambil nilai tanggal_presensi sebagai string murni Y-m-d
                 $cleanTanggal = Carbon::parse($presensi->tanggal_presensi)->toDateString();
                 $cleanJamMasuk = trim($presensi->jam_masuk);
                 
-                // Jika jam_masuk menyertakan format datetime, bersihkan sehingga hanya H:i:s
                 if (strlen($cleanJamMasuk) > 8) {
                     $cleanJamMasuk = Carbon::parse($cleanJamMasuk)->format('H:i:s');
                 }
 
-                // Buat objek Carbon jam masuk murni
                 $jamMasukCarbon = Carbon::parse("{$cleanTanggal} {$cleanJamMasuk}", 'Asia/Jakarta');
-                
-                // Hitung Durasi Kerja (dalam Menit)
                 $durasiKerjaMenit = $jamMasukCarbon->diffInMinutes($targetDateTime);
 
                 $updateData = [
@@ -430,7 +462,6 @@ class PresensiController extends Controller
 
             $logs = $query->paginate(10)->withQueryString();
 
-            // Cek file view yang tersedia
             if (view()->exists('petugas.attendance.log')) {
                 return view('petugas.attendance.log', compact('logs'));
             }
@@ -439,7 +470,7 @@ class PresensiController extends Controller
                 return view('petugas.riwayat-absensi', compact('logs'));
             }
 
-            return view('petugas.dashboard', compact('logs'));
+            return view('petugas.dashboard-petugas', compact('logs'));
 
         } catch (Exception $e) {
             Log::error('Gagal memuat log presensi petugas: ' . $e->getMessage());
