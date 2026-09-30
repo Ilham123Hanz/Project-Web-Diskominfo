@@ -16,40 +16,69 @@ class AuthController extends Controller
      */
     public function showLoginForm()
     {
+        // Jika pengguna sudah terautentikasi, arahkan sesuai role
+        if (Auth::check()) {
+            $user = Auth::user();
+            return strcasecmp($user->role, 'Admin') === 0 
+                ? redirect()->route('admin.dashboard') 
+                : redirect()->route('petugas.dashboard');
+        }
+
         return view('auth.login');
     }
 
     /**
      * Menangani proses autentikasi masuk pengguna (Admin / Petugas).
+     * Mendukung login via Username/NPM/NIP maupun Email.
      */
     public function login(Request $request) 
     {
-        $credentials = $request->validate([
+        // 1. Validasi Input
+        $credentialsInput = $request->validate([
             'username' => 'required|string', 
             'password' => 'required|string',
         ], [
-            'username.required' => 'Nama pengguna / NPM / NIP wajib diisi.',
+            'username.required' => 'Nama pengguna / NPM / NIP / Email wajib diisi.',
             'password.required' => 'Kata sandi wajib diisi.'
         ]);
 
-        if (Auth::attempt($credentials)) {
+        $loginInput = $request->input('username');
+        $password = $request->input('password');
+        $remember = $request->filled('remember');
+
+        // 2. Tentukan field pencarian: Email atau Username
+        $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        $credentials = [
+            $fieldType => $loginInput,
+            'password'  => $password,
+        ];
+
+        // 3. Eksekusi Autentikasi dengan Pilihan Remember Me
+        if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
             
             $user = Auth::user();
 
+            // Log Audit Keamanan
+            Log::info("SIP-O-SIBER Login Success: User [{$user->username}] logged in with IP [{$request->ip()}].");
+
             if (strcasecmp($user->role, 'Admin') === 0) {
                 return redirect()
-                    ->route('admin.dashboard')
+                    ->intended(route('admin.dashboard'))
                     ->with('success', 'Otorisasi Berhasil. Selamat datang Admin pada repositori pusat SIP-O-SIBER.');
             }
 
             return redirect()
-                ->route('petugas.dashboard')
+                ->intended(route('petugas.dashboard'))
                 ->with('success', 'Koneksi Terhubung. Selamat bekerja, Operator ' . $user->name . '.');
         }
 
+        // Log Keamanan Akses Gagal
+        Log::warning("SIP-O-SIBER Login Failed: Attempted login for [{$loginInput}] from IP [{$request->ip()}].");
+
         return back()
-            ->withInput($request->only('username'))
+            ->withInput($request->only('username', 'remember'))
             ->withErrors([
                 'login_error' => 'Akses ditolak. Nama Pengguna/NPM/NIP atau kata sandi tidak cocok.'
             ]);
@@ -60,6 +89,10 @@ class AuthController extends Controller
      */
     public function showRegisterForm()
     {
+        if (Auth::check()) {
+            return redirect()->back();
+        }
+
         return view('auth.register');
     }
 
@@ -71,7 +104,7 @@ class AuthController extends Controller
         $request->validate([
             'name'     => 'required|string|max:255',
             'username' => 'required|string|max:50|unique:users,username', 
-            'email'    => 'required|email|unique:users,email',      
+            'email'    => 'required|email|max:255|unique:users,email',      
             'password' => 'required|string|min:8|confirmed',        
         ], [
             'name.required'      => 'Nama lengkap wajib diisi.',
@@ -85,19 +118,32 @@ class AuthController extends Controller
             'password.min'       => 'Kata sandi minimal harus 8 karakter.'
         ]);
 
-        DB::transaction(function () use ($request) {
-            User::create([
-                'name'     => $request->name,
-                'username' => $request->username, 
-                'email'    => $request->email,    
-                'password' => Hash::make($request->password), 
-                'role'     => 'Petugas', 
-            ]);
-        });
+        try {
+            DB::transaction(function () use ($request) {
+                User::create([
+                    'name'     => trim($request->name),
+                    'username' => trim($request->username), 
+                    'email'    => strtolower(trim($request->email)),    
+                    'password' => Hash::make($request->password), 
+                    'role'     => 'Petugas', 
+                ]);
+            });
 
-        return redirect()
-            ->route('login')
-            ->with('success', 'Registrasi berhasil! Akun Anda telah terdaftar. Silakan masuk ke sistem.');
+            Log::info("SIP-O-SIBER Registration: New user registered [{$request->username}] from IP [{$request->ip()}].");
+
+            return redirect()
+                ->route('login')
+                ->with('success', 'Registrasi berhasil! Akun Anda telah terdaftar. Silakan masuk ke sistem.');
+
+        } catch (\Exception $e) {
+            Log::error('Registration Error: ' . $e->getMessage());
+
+            return back()
+                ->withInput($request->except('password', 'password_confirmation'))
+                ->withErrors([
+                    'system_error' => 'Gagal memproses pendaftaran. Terjadi kesalahan pada sistem data.'
+                ]);
+        }
     }
 
     /**
@@ -120,7 +166,7 @@ class AuthController extends Controller
             'username' => 'required|string',
             'password' => 'required|string|min:8|confirmed',
         ], [
-            'username.required'  => 'Nama Pengguna (Username/NPM/NIP) wajib diisi.',
+            'username.required'  => 'Nama Pengguna (Username/NPM/NIP/Email) wajib diisi.',
             'password.required'  => 'Kata sandi baru wajib diisi.',
             'password.min'       => 'Kata sandi baru minimal harus 8 karakter.',
             'password.confirmed' => 'Konfirmasi kata sandi baru tidak cocok.',
@@ -147,6 +193,8 @@ class AuthController extends Controller
                 ]);
             });
 
+            Log::info("SIP-O-SIBER Password Reset: User [{$user->username}] successfully updated password.");
+
             // 4. Redirect ke Login dengan Pesan Sukses
             return redirect()
                 ->route('login')
@@ -168,11 +216,16 @@ class AuthController extends Controller
      */
     public function logout(Request $request) 
     {
+        $user = Auth::user();
+        if ($user) {
+            Log::info("SIP-O-SIBER Logout: User [{$user->username}] logged out.");
+        }
+
         Auth::logout();
         
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         
-        return redirect('/login')->with('success', 'Sesi login instansi telah ditutup dengan aman.');
+        return redirect()->route('login')->with('success', 'Sesi login instansi telah ditutup dengan aman.');
     }
 }

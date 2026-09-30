@@ -19,21 +19,6 @@
 
 @section('content')
 
-{{-- Notifikasi Berhasil / Gagal --}}
-@if(session('success'))
-    <div class="alert alert-success border-0 rounded-4 shadow-sm mb-4 alert-dismissible fade show" role="alert" style="font-size: 13px;">
-        <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-@endif
-
-@if(session('error'))
-    <div class="alert alert-danger border-0 rounded-4 shadow-sm mb-4 alert-dismissible fade show" role="alert" style="font-size: 13px;">
-        <i class="fas fa-exclamation-circle me-2"></i> {{ session('error') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-@endif
-
 {{-- Header Action Bar (Pencarian & Tombol Aksi) --}}
 <div class="row align-items-center mb-4 g-3">
     <div class="col-md-5">
@@ -57,10 +42,10 @@
 <div class="row g-4 mb-4">
     @forelse($folders as $folder)
         <div class="col-xxl-3 col-xl-4 col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 p-4 text-center h-100 position-relative folder-card transition-hover">
-                
+            <a href="{{ route('admin.folders.show', $folder->id) }}" class="text-decoration-none">
+            <div class="card border-0 shadow-sm rounded-4 p-4 text-center h-100 position-relative folder-card transition-hover" style="cursor: pointer;">
                 {{-- Tombol Hapus Folder di Pojok Kanan Atas Kartu --}}
-                <form action="{{ route('admin.folders.destroy', $folder->id) }}" method="POST" class="position-absolute top-0 end-0 m-2 style-delete-form" onsubmit="return confirm('Apakah Anda yakin ingin menghapus folder {{ $folder->name }} beserta isinya?')">
+                <form action="{{ route('admin.folders.destroy', $folder->id) }}" method="POST" class="position-absolute top-0 end-0 m-2 style-delete-form" onsubmit="event.stopPropagation(); return confirm('Apakah Anda yakin ingin menghapus folder {{ $folder->name }} beserta isinya?')">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="btn btn-sm btn-light text-danger border-0 rounded-circle p-2 shadow-2xs" title="Hapus Folder" style="z-index: 5; width: 32px; height: 32px; line-height: 1;">
@@ -74,6 +59,7 @@
                 <h6 class="fw-bold text-dark mb-1 text-truncate" style="font-size: 15px;" title="{{ $folder->name }}">{{ $folder->name }}</h6>
                 <p class="text-muted small mb-0" style="font-size: 12px;">{{ $folder->description ?? 'Tidak ada deskripsi' }}</p>
             </div>
+            </a>
         </div>
     @empty
         <div class="col-12 text-center py-5">
@@ -86,7 +72,6 @@
     @endforelse
 </div>
 
-{{-- ================= MODAL: BUAT FOLDER BARU ================= --}}
 <div class="modal fade" id="modalBuatFolder" tabindex="-1" aria-labelledby="modalBuatFolderLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow rounded-4 p-3">
@@ -106,6 +91,29 @@
                             <input type="text" name="name" class="form-control" placeholder="Contoh: Arsip_Keuangan_2026" style="font-size: 13px;" required autofocus>
                         </div>
                         <div class="form-text text-muted" style="font-size: 11px;">Gunakan garis bawah (_) untuk spasi nama folder agar konsisten.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Kategori V-Drive (main_menu) <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-muted"><i class="fas fa-layer-group"></i></span>
+                            <select name="main_menu" class="form-control" required style="font-size: 13px;">
+                                <option value="" disabled selected>-- Pilih Kategori V-Drive --</option>
+                                <option value="Patroli Siber">Patroli Siber</option>
+                                <option value="Bug Hunter">Bug Hunter</option>
+                                <option value="CTI">CTI</option>
+                                <option value="Laporan Insiden">Laporan Insiden</option>
+                                <option value="Sosial Media">Sosial Media</option>
+                                <option value="Vul/Pen Test">Vul/Pen Test</option>
+                            </select>
+                        </div>
+                        <div class="form-text text-muted" style="font-size: 11px;">Kategori ini digunakan untuk mengelompokkan laporan patroli dari petugas.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-secondary">Tahun <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-muted"><i class="fas fa-calendar"></i></span>
+                            <input type="number" name="year" class="form-control" value="{{ date('Y') }}" min="2020" max="{{ date('Y') + 1 }}" style="font-size: 13px;" required>
+                        </div>
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-semibold small text-secondary">Keterangan / Deskripsi Singkat</label>

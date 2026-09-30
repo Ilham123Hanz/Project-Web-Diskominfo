@@ -108,7 +108,7 @@
             position: relative;
             z-index: 10;
             width: 100%;
-            max-width: 440px;
+            max-width: 450px;
             margin: auto;
         }
 
@@ -116,7 +116,7 @@
             background: #FFFFFF;
             border-radius: 20px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 210, 255, 0.18);
-            padding: 28px 30px 24px 30px;
+            padding: 32px 32px 28px 32px;
             border: 1px solid rgba(255, 255, 255, 0.3);
             position: relative;
             overflow: hidden;
@@ -133,15 +133,15 @@
 
         /* Header Logo & Icon */
         .brand-header-icon {
-            width: 48px;
-            height: 48px;
+            width: 52px;
+            height: 52px;
             background: rgba(0, 82, 163, 0.08);
             border: 1.5px solid rgba(0, 82, 163, 0.18);
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             box-shadow: 0 4px 12px rgba(0, 82, 163, 0.08);
         }
 
@@ -149,20 +149,20 @@
             font-weight: 800;
             letter-spacing: 0.5px;
             color: var(--kominfo-dark);
-            font-size: 1.3rem;
-            margin-bottom: 2px;
+            font-size: 1.35rem;
+            margin-bottom: 4px;
         }
 
         .brand-subtitle {
-            font-size: 0.78rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
-            line-height: 1.4;
+            line-height: 1.45;
             font-weight: 500;
         }
 
         /* Label Form & Input Formatting */
         .form-group-custom {
-            margin-bottom: 1.05rem;
+            margin-bottom: 1.15rem;
         }
 
         .form-label-custom {
@@ -193,7 +193,7 @@
         .focus-cyber {
             background-color: #F8FAFC !important;
             border: 1.5px solid #CBD5E1 !important;
-            padding: 9px 14px 9px 42px !important;
+            padding: 9px 40px 9px 42px !important;
             border-radius: 10px !important;
             font-size: 0.85rem !important;
             color: var(--text-dark) !important;
@@ -240,7 +240,7 @@
             background-color: #E2E8F0;
             border-radius: 3px;
             overflow: hidden;
-            margin-top: 6px;
+            margin-top: 8px;
         }
 
         .entropy-bar {
@@ -293,7 +293,7 @@
             font-size: 0.725rem;
             color: #DC2626;
             font-weight: 600;
-            margin-top: 4px;
+            margin-top: 5px;
             display: block;
         }
 
@@ -307,9 +307,9 @@
             color: var(--text-muted);
             font-size: 0.735rem;
             text-align: center;
-            margin-top: 14px;
+            margin-top: 16px;
             font-weight: 500;
-            line-height: 1.4;
+            line-height: 1.45;
         }
     </style>
 </head>
@@ -323,7 +323,7 @@
         <div class="register-card">
             
             <!-- HEADER LOGO & JUDUL -->
-            <div class="text-center mb-3.5">
+            <div class="text-center mb-4">
                 <div class="brand-header-icon">
                     <i class="fas fa-user-plus text-primary" style="font-size: 1.25rem;"></i>
                 </div>
@@ -333,7 +333,7 @@
 
             <!-- NOTIFIKASI ERROR LARAVEL -->
             @if ($errors->any())
-                <div class="alert alert-danger border-0 text-danger bg-danger bg-opacity-10 mb-3 p-2.5 px-3 rounded-3 shadow-sm">
+                <div class="alert alert-danger border-0 text-danger bg-danger bg-opacity-10 mb-3 p-3 rounded-3 shadow-sm">
                     <div class="d-flex align-items-center fw-bold mb-1" style="font-size: 0.8rem;">
                         <i class="fas fa-triangle-exclamation me-2 flex-shrink-0" style="font-size: 0.95rem;"></i>
                         <span>Pendaftaran Gagal Diproses!</span>
@@ -360,7 +360,7 @@
                                name="name" 
                                class="form-control focus-cyber w-100 @error('name') has-error-cyber @enderror" 
                                value="{{ old('name') }}" 
-                               placeholder="Masukkan nama lengkap & gelar" 
+                               placeholder="Masukkan nama lengkap" 
                                required 
                                autofocus>
                     </div>
@@ -373,7 +373,7 @@
                 <div class="form-group-custom">
                     <label class="form-label-custom" for="usernameInput">
                         <span>Nama Pengguna</span>
-                        <span class="text-muted fw-normal" style="font-size: 0.7rem;">(Username / NPM / NIP)</span>
+                        <span class="text-muted fw-normal" style="font-size: 0.7rem;">(Username / NPM)</span>
                     </label>
                     <div class="input-group-custom">
                         <i class="fas fa-user-shield input-icon-left"></i>

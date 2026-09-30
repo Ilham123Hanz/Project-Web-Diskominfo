@@ -1,11 +1,10 @@
 @extends('admin.admin-layout')
 
-{{-- Ubah Judul Halaman Utama di Layout --}}
 @section('page_heading', 'Rekapitulasi Absensi Petugas Patroli')
 
 {{-- Sesuaikan Breadcrumb agar sesuai --}}
 @section('breadcrumb')
- Home > Menu Utama > <span class="text-dark">Pantau Absensi</span>
+Home > Menu Utama > <span class="text-dark">Pantau Absensi</span>
 @endsection
 
 @section('content')
@@ -47,32 +46,88 @@
                 <table class="table table-bordered table-striped table-hover align-middle mb-0" style="border-color: #e9ecef;">
                     <thead class="table-light text-dark">
                         <tr>
-                            <th class="py-3 px-3 text-center" style="width: 60px;">NO</th>
-                            <th class="py-3 px-3">NAMA PETUGAS PATROLI</th>
-                            <th class="py-3 px-3">SHIFT PENUGASAN</th>
-                            <th class="py-3 px-3">TANGGAL PRESENSI</th>
-                            <th class="py-3 px-3">WAKTU KEHADIRAN</th>
+                            <th class="py-3 px-3 text-center" style="width: 5%;">NO</th>
+                            <th class="py-3 px-3">TANGGAL</th>
+                            <th class="py-3 px-3">NAMA PETUGAS</th>
+                            <th class="py-3 px-3">JAM MASUK</th>
+                            <th class="py-3 px-3">JAM PULANG</th>
+                            <th class="py-3 px-3 text-center">STATUS MASUK</th>
+                            <th class="py-3 px-3 text-center">STATUS PULANG</th>
                             <th class="py-3 px-3 text-center">STATUS KEHADIRAN</th>
+                            <th class="py-3 px-3">DURASI KERJA</th>
+                            <th class="py-3 px-3">CATATAN</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($attendances as $index => $item)
                         <tr>
                             <td class="px-3 text-center">{{ $attendances->firstItem() + $index }}</td>
+                            <td class="px-3">
+                                <strong class="text-dark d-block" style="font-size: 14px;">{{ $item->tanggal_presensi ? \Carbon\Carbon::parse($item->tanggal_presensi)->translatedFormat('d M Y') : '-' }}</strong>
+                                <small class="text-muted" style="font-size: 11px;">({{ $item->tanggal_presensi ? \Carbon\Carbon::parse($item->tanggal_presensi)->isoFormat('dddd') : '-' }})</small>
+                            </td>
                             <td class="px-3 fw-semibold">{{ $item->user->name ?? '-' }}</td>
-                            <td class="px-3">{{ $item->shift ?? 'Shift Pagi' }}</td>
-                            <td class="px-3">{{ $item->tanggal_presensi ? \Carbon\Carbon::parse($item->tanggal_presensi)->format('d-m-Y') : '-' }}</td>
                             <td class="px-3">{{ $item->jam_masuk ? $item->jam_masuk . ' WIB' : '-' }}</td>
+                            <td class="px-3">{{ $item->jam_pulang ? $item->jam_pulang . ' WIB' : 'Belum Pulang' }}</td>
                             <td class="px-3 text-center">
-                                <span class="badge bg-success-subtle text-success px-2 py-1 rounded-pill">
-                                    {{ $item->status_kehadiran ?? 'Hadir' }}
-                                </span>
+                                @if($item->status_masuk === 'Terlambat')
+                                    <span class="badge rounded-pill bg-warning bg-opacity-15 text-dark border border-warning border-opacity-25 px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-clock me-1 text-warning"></i> Terlambat
+                                    </span>
+                                @else
+                                    <span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-check-circle me-1"></i> Tepat Waktu
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="px-3 text-center">
+                                @if($item->status_pulang === 'Pulang Cepat')
+                                    <span class="badge rounded-pill bg-warning bg-opacity-15 text-dark border border-warning border-opacity-25 px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-sign-out-alt me-1"></i> Pulang Cepat
+                                    </span>
+                                @elseif($item->status_pulang === 'Selesai')
+                                    <span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-check-circle me-1"></i> Selesai
+                                    </span>
+                                @elseif(empty($item->jam_pulang))
+                                    <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        Belum Pulang
+                                    </span>
+                                @else
+                                    <span class="badge rounded-pill bg-secondary bg-opacity-10 text-secondary px-3 py-2 fw-semibold" style="font-size: 11px;">{{ $item->status_pulang }}</span>
+                                @endif
+                            </td>
+                            <td class="px-3 text-center">
+                                @if($item->status_kehadiran === 'Hadir')
+                                    <span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-check-circle me-1"></i> Hadir
+                                    </span>
+                                @elseif($item->status_kehadiran === 'Izin')
+                                    <span class="badge rounded-pill bg-info bg-opacity-10 text-info px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-file-alt me-1"></i> Izin
+                                    </span>
+                                @elseif($item->status_kehadiran === 'Sakit')
+                                    <span class="badge rounded-pill bg-purple bg-opacity-10 text-purple px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-thermometer-half me-1"></i> Sakit
+                                    </span>
+                                @elseif($item->status_kehadiran === 'Dinas Luar')
+                                    <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2 fw-semibold" style="font-size: 11px;">
+                                        <i class="fas fa-briefcase me-1"></i> Dinas Luar
+                                    </span>
+                                @else
+                                    <span class="badge rounded-pill bg-danger bg-opacity-10 text-danger px-3 py-2 fw-semibold" style="font-size: 11px;">{{ $item->status_kehadiran }}</span>
+                                @endif
+                            </td>
+                            <td class="px-3">
+                                <span class="badge bg-dark font-monospace fw-normal">{{ $item->durasi_kerja_formatted ?? ($item->durasi_kerja ? ($item->durasi_kerja . ' Menit') : '0 Menit') }}</span>
+                            </td>
+                            <td class="px-3">
+                                <small class="text-muted" style="max-width: 200px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ $item->catatan_masuk ?? $item->catatan_pulang ?? '-' }}</small>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">Belum ada data presensi untuk periode ini.</td>
-                        </tr>
+                            <td colspan="10" class="text-center py-4 text-muted">Belum ada data presensi untuk periode ini.</                        </tr>
                         @endforelse
                     </tbody>
                 </table>

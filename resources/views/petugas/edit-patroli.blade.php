@@ -1,10 +1,10 @@
 @extends('petugas.petugas-layout.petugas-layout')
 
-@section('title', 'Input Form Patroli Siber - SIP-O-SIBER')
+@section('title', 'Edit Laporan Patroli - {{ $laporan->log_code }}')
 
 @push('styles')
 <style>
-    /* Base Typography & Container */
+    /* Tipografi Base System & Keterbacaan Visual */
     body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         color: #1e293b;
@@ -18,33 +18,13 @@
 
     .card-custom {
         background: #ffffff;
-        border-radius: 16px;
+        border-radius: 14px;
         border: 1px solid #e2e8f0;
         box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 0 8px 10px -6px rgba(15, 23, 42, 0.02);
         padding: 36px;
-        position: relative;
     }
     
-    /* Wizard Step Indicator & Dynamic Progress Bar */
-    .wizard-header-wrapper {
-        margin-bottom: 32px;
-    }
-
-    .progress-bar-wrapper {
-        height: 6px;
-        background-color: #e2e8f0;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 20px;
-    }
-
-    .progress-bar-fill {
-        height: 100%;
-        width: 33.33%;
-        background: linear-gradient(90deg, #0f3057 0%, #2563eb 100%);
-        transition: width 0.4s ease-in-out;
-    }
-
+    /* Wizard Step Indicator */
     .step-indicator {
         display: flex;
         justify-content: space-between;
@@ -53,9 +33,9 @@
         padding: 18px 28px;
         border-radius: 12px;
         border: 1px solid #e2e8f0;
+        margin-bottom: 32px;
         position: relative;
     }
-
     .step-item {
         display: flex;
         align-items: center;
@@ -65,17 +45,14 @@
         transition: all 0.3s ease;
         z-index: 2;
     }
-
     .step-item.active {
         color: #0f3057;
         font-weight: 700;
     }
-
     .step-item.completed {
         color: #059669;
         font-weight: 600;
     }
-
     .step-icon {
         width: 38px;
         height: 38px;
@@ -89,13 +66,11 @@
         font-weight: 700;
         transition: all 0.3s ease;
     }
-
     .step-item.active .step-icon {
         background: #0f3057;
         color: #ffffff;
         box-shadow: 0 0 0 4px rgba(15, 48, 87, 0.15);
     }
-
     .step-item.completed .step-icon {
         background: #10b981;
         color: #ffffff;
@@ -105,22 +80,20 @@
     .input-gov {
         font-size: 0.875rem;
         border-color: #cbd5e1;
-        padding: 0.65rem 0.85rem;
+        padding: 0.6rem 0.85rem;
         border-radius: 8px;
         transition: all 0.2s ease;
     }
-
     .input-gov:focus {
         border-color: #0f3057;
         box-shadow: 0 0 0 0.2rem rgba(15, 48, 87, 0.12);
     }
-
     label.form-label {
         font-size: 0.825rem;
         letter-spacing: 0.01em;
     }
 
-    /* Dynamic File Upload Area */
+    /* Container Dynamic File Upload Area */
     .upload-area {
         border: 2px dashed #cbd5e1;
         border-radius: 12px;
@@ -130,11 +103,9 @@
         cursor: pointer;
         transition: all 0.25s ease-in-out;
     }
-
     .upload-area:hover, .upload-area.dragover {
         border-color: #0f3057;
         background: #f1f5f9;
-        transform: scale(1.005);
     }
 
     /* Preview Container */
@@ -145,9 +116,7 @@
         background-color: #ffffff;
         display: none;
         margin-top: 16px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
-
     .preview-image {
         max-height: 80px;
         object-fit: contain;
@@ -155,25 +124,18 @@
         border: 1px solid #e2e8f0;
     }
 
-    /* Wizard Step Content Animation */
+    /* Step Content Animation Display */
     .wizard-step-content {
         display: none;
     }
-
     .wizard-step-content.active {
         display: block;
-        animation: slideFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: fadeIn 0.3s ease-in-out;
     }
 
-    @keyframes slideFadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 </style>
 @endpush
@@ -182,19 +144,14 @@
 <div class="container-fluid px-4">
     <div class="main-container-patrol">
         
-        <!-- Header Navigasi & Status -->
+        <!-- Header Navigasi -->
         <div class="d-flex align-items-center justify-content-between mb-3">
-            <a href="{{ route('petugas.dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-2 fw-bold px-3 py-1.5">
-                <i class="fas fa-arrow-left me-1.5"></i> Kembali ke Dashboard
+            <a href="{{ route('petugas.patrol.history') }}" class="btn btn-outline-secondary btn-sm rounded-2 fw-bold px-3 py-1.5">
+                <i class="fas fa-arrow-left me-1.5"></i> Kembali ke Riwayat
             </a>
-            <div class="d-flex align-items-center gap-2">
-                <button type="button" id="btnRestoreDraft" class="btn btn-xs btn-outline-info rounded-2 fw-semibold d-none" onclick="restoreDraftData()">
-                    <i class="fas fa-undo me-1"></i> Pulihkan Draft
-                </button>
-                <span class="badge bg-dark font-monospace px-3 py-2" style="font-size: 0.75rem;">
-                    <i class="fas fa-network-wired me-1"></i> IP: {{ request()->ip() }}
-                </span>
-            </div>
+            <span class="badge bg-dark font-monospace px-3 py-2" style="font-size: 0.75rem;">
+                <i class="fas fa-network-wired me-1"></i> IP: {{ request()->ip() }}
+            </span>
         </div>
 
         <!-- Flash Message Alerts -->
@@ -223,73 +180,62 @@
         <!-- Card Form Utama -->
         <div class="card card-custom">
             <div class="text-center mb-2">
-                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 px-3 py-2 text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                    <i class="fas fa-clipboard-list me-1"></i> Formulir Entri Log SIBER
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 px-3 py-2 text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                    <i class="fas fa-edit me-1"></i> Edit & Revisi Laporan
                 </span>
             </div>
-            <h3 class="fw-bold text-center mb-1" style="color: #0f3057;">Input Form Patroli Siber</h3>
-            <p class="text-muted text-center small mb-4">Catat temuan patroli siber Anda secara sistematis. Berkas bukti akan diverifikasi kelayakannya sebelum disimpan.</p>
-
-            <!-- Wizard Header Indicator & Progress Bar -->
-            <div class="wizard-header-wrapper">
-                <div class="progress-bar-wrapper">
-                    <div class="progress-bar-fill" id="wizardProgressBar"></div>
+            <h3 class="fw-bold text-center mb-1" style="color: #0f3057;">Perbaiki Laporan Patroli Siber</h3>
+            <p class="text-muted text-center small mb-4">Kode Log: <strong class="text-dark">{{ $laporan->log_code }}</strong> | Status: <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-20 fw-bold px-2 py-1">{{ $laporan->status }}</span></p>
+            <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning fw-semibold p-3 mb-4 rounded-3 shadow-sm d-flex align-items-start" role="alert">
+                <i class="fas fa-exclamation-triangle fa-lg me-2 mt-0.5"></i>
+                <div>
+                    <h6 class="fw-bold mb-1 text-dark">Catatan Revisi dari Admin:</h6>
+                    <p class="mb-0 text-muted small">{{ $laporan->admin_correction ?? 'Tidak ada catatan spesifik.' }}</p>
                 </div>
-                <div class="step-indicator">
-                    <div class="step-item active" id="step-node-1">
-                        <div class="step-icon" id="step-icon-1">1</div>
-                        <div>
-                            <small class="d-block text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Langkah 1</small>
-                            <span class="fw-bold">Klasifikasi & Drive</span>
-                        </div>
+            </div>
+
+            <!-- Multi-Step Indicator -->
+            <div class="step-indicator">
+                <div class="step-item completed" id="step-node-1">
+                    <div class="step-icon" id="step-icon-1"><i class="fas fa-check"></i></div>
+                    <div>
+                        <small class="d-block text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Langkah 1</small>
+                        <span class="fw-bold">Klasifikasi & Drive</span>
                     </div>
-                    <div class="step-item" id="step-node-2">
-                        <div class="step-icon" id="step-icon-2">2</div>
-                        <div>
-                            <small class="d-block text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Langkah 2</small>
-                            <span class="fw-bold">Detail Target & Isu</span>
-                        </div>
+                </div>
+                <div class="step-item active" id="step-node-2">
+                    <div class="step-icon" id="step-icon-2">2</div>
+                    <div>
+                        <small class="d-block text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Langkah 2</small>
+                        <span class="fw-bold">Detail Target & Isu</span>
                     </div>
-                    <div class="step-item" id="step-node-3">
-                        <div class="step-icon" id="step-icon-3">3</div>
-                        <div>
-                            <small class="d-block text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Langkah 3</small>
-                            <span class="fw-bold">Matriks & Bukti</span>
-                        </div>
+                </div>
+                <div class="step-item" id="step-node-3">
+                    <div class="step-icon" id="step-icon-3">3</div>
+                    <div>
+                        <small class="d-block text-muted" style="font-size: 0.68rem; text-transform: uppercase; font-weight: 600;">Langkah 3</small>
+                        <span class="fw-bold">Matriks & Bukti</span>
                     </div>
                 </div>
             </div>
 
-            <form action="{{ route('petugas.patrol.store') }}" method="POST" enctype="multipart/form-data" id="patrolForm" class="needs-validation" novalidate>
+            <form action="{{ route('petugas.patrol.update', $laporan->id) }}" method="POST" enctype="multipart/form-data" id="patrolForm" class="needs-validation" novalidate>
                 @csrf
+                @method('PUT')
 
-                <!-- STEP 1: KLASIFIKASI & V-DRIVE -->
-                <div class="wizard-step-content active" id="wizard-step-1">
+                <!-- STEP 1: KLASIFIKASI & GOOGLE DRIVE FOLDER (Read-only untuk edit) -->
+                <div class="wizard-step-content completed" id="wizard-step-1">
                     <div class="border-bottom pb-2 mb-3">
-                        <h6 class="fw-bold mb-0" style="color: #0f3057;"><i class="fas fa-layer-group me-1.5 text-primary"></i> Langkah 1: Pengelompokan Kerja & V-Drive</h6>
+                        <h6 class="fw-bold mb-0" style="color: #0f3057;"><i class="fas fa-layer-group me-1.5 text-primary"></i> Langkah 1: Pengelompokan Kerja & V-Drive <span class="badge bg-success bg-opacity-10 text-success ms-2"><i class="fas fa-check me-1"></i> Selesai</span></h6>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark mb-1">Rumpun Kategori Kerja <span class="text-danger">*</span></label>
-                            <select name="rumpun_kategori" id="rumpun_kategori" class="form-select input-gov auto-save" required>
-                                <option value="" disabled selected>-- Pilih Rumpun Kerja --</option>
-                                <option value="Patroli Harian" {{ old('rumpun_kategori') == 'Patroli Harian' ? 'selected' : '' }}>Patroli Harian</option>
-                                <option value="Advanced Assessment" {{ old('rumpun_kategori') == 'Advanced Assessment' ? 'selected' : '' }}>Advanced Assessment</option>
-                            </select>
-                            <div class="invalid-feedback small">Rumpun kategori kerja wajib dipilih.</div>
+                            <label class="form-label fw-bold text-dark mb-1">Rumpun Kategori Kerja</label>
+                            <input type="text" class="form-control input-gov" value="{{ $laporan->rumpun_kategori }}" readonly>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold text-dark mb-1">Kategori Folder Google Drive <span class="text-danger">*</span></label>
-                            <select name="main_menu" id="main_menu" class="form-select input-gov auto-save" required>
-                                <option value="" disabled selected>-- Pilih Folder V-Drive Tujuan --</option>
-                                <option value="Patroli Siber" {{ old('main_menu') == 'Patroli Siber' ? 'selected' : '' }}>Patroli Siber</option>
-                                <option value="Bug Hunter" {{ old('main_menu') == 'Bug Hunter' ? 'selected' : '' }}>Bug Hunter</option>
-                                <option value="CTI" {{ old('main_menu') == 'CTI' ? 'selected' : '' }}>CTI</option>
-                                <option value="Laporan Insiden" {{ old('main_menu') == 'Laporan Insiden' ? 'selected' : '' }}>Laporan Insiden</option>
-                                <option value="Sosial Media" {{ old('main_menu') == 'Sosial Media' ? 'selected' : '' }}>Sosial Media</option>
-                                <option value="Vul/Pen Test" {{ old('main_menu') == 'Vul/Pen Test' ? 'selected' : '' }}>Vul/Pen Test</option>
-                            </select>
-                            <div class="invalid-feedback small">Folder virtual drive tujuan wajib ditentukan.</div>
+                            <label class="form-label fw-bold text-dark mb-1">Kategori Folder Google Drive</label>
+                            <input type="text" class="form-control input-gov" value="{{ $laporan->main_menu }}" readonly>
                         </div>
                     </div>
                     <div class="d-flex justify-content-end mt-4 pt-3 border-top">
@@ -308,41 +254,42 @@
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark mb-1">OPD / Instansi Sasaran <span class="text-danger">*</span></label>
                             <input type="text" id="opdFilterInput" class="form-control form-control-sm mb-2 rounded-2" placeholder="🔍 Ketik untuk memfilter instansi...">
-                            <select name="agency_name" id="agencySelect" class="form-select input-gov auto-save" required onchange="handleManualToggle('agency')">
-                                <option value="" disabled selected>-- Pilih OPD / Instansi --</option>
+                            <select name="agency_name" id="agencySelect" class="form-select input-gov" required onchange="handleManualToggle('agency')">
+                                <option value="" disabled>-- Pilih OPD / Instansi --</option>
                                 @if(isset($listOPD) && count($listOPD) > 0)
                                     @foreach($listOPD as $opd)
-                                        <option value="{{ $opd }}" {{ old('agency_name') == $opd ? 'selected' : '' }}>{{ $opd }}</option>
+                                        <option value="{{ $opd }}" {{ $laporan->opd_sasaran == $opd ? 'selected' : '' }}>{{ $opd }}</option>
                                     @endforeach
                                 @else
-                                    <option value="BAPPEDA Lampung">BAPPEDA Lampung</option>
-                                    <option value="Dinas Kesehatan">Dinas Kesehatan</option>
-                                    <option value="Dinas Pendidikan">Dinas Pendidikan</option>
-                                    <option value="Diskominfo Lampung">Diskominfo Lampung</option>
+                                    <option value="BAPPEDA Lampung" {{ $laporan->opd_sasaran == 'BAPPEDA Lampung' ? 'selected' : '' }}>BAPPEDA Lampung</option>
+                                    <option value="Dinas Kesehatan" {{ $laporan->opd_sasaran == 'Dinas Kesehatan' ? 'selected' : '' }}>Dinas Kesehatan</option>
+                                    <option value="Dinas Pendidikan" {{ $laporan->opd_sasaran == 'Dinas Pendidikan' ? 'selected' : '' }}>Dinas Pendidikan</option>
+                                    <option value="Diskominfo Lampung" {{ $laporan->opd_sasaran == 'Diskominfo Lampung' ? 'selected' : '' }}>Diskominfo Lampung</option>
                                 @endif
-                                <option value="Lainnya" {{ old('agency_name') == 'Lainnya' ? 'selected' : '' }}>-- Perangkat Daerah Tidak Ada (Input Manual) --</option>
+                                <option value="Lainnya" {{ !in_array($laporan->opd_sasaran, $listOPD ?? []) && $laporan->opd_sasaran ? 'selected' : '' }}>-- Perangkat Daerah Tidak Ada (Input Manual) --</option>
                             </select>
-                            <input type="text" name="agency_name_manual" id="agencyManualInput" class="form-control input-gov mt-2 d-none auto-save" value="{{ old('agency_name_manual') }}" placeholder="Tuliskan nama OPD/Instansi baru...">
+                            <input type="text" name="agency_name_manual" id="agencyManualInput" class="form-control input-gov mt-2 d-none" value="{{ !in_array($laporan->opd_sasaran, $listOPD ?? []) && $laporan->opd_sasaran ? $laporan->opd_sasaran : '' }}" placeholder="Tuliskan nama OPD/Instansi baru...">
                             <div class="invalid-feedback small">OPD/Instansi sasaran wajib ditentukan.</div>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark mb-1">Kategori Insiden / Isu Siber <span class="text-danger">*</span></label>
-                            <select name="category" id="categorySelect" class="form-select input-gov auto-save" required onchange="handleManualToggle('category')">
-                                <option value="" disabled selected>-- Pilih Kategori Insiden --</option>
+                            <select name="category" id="categorySelect" class="form-select input-gov" required onchange="handleManualToggle('category')">
+                                <option value="" disabled>-- Pilih Kategori Insiden --</option>
                                 @if(isset($listKategori) && count($listKategori) > 0)
                                     @foreach($listKategori as $kat)
-                                        <option value="{{ $kat }}" {{ old('category') == $kat ? 'selected' : '' }}>{{ $kat }}</option>
+                                        <option value="{{ $kat }}" {{ $laporan->kategori_insiden == $kat ? 'selected' : '' }}>{{ $kat }}</option>
                                     @endforeach
                                 @else
-                                    <option value="Web Defacement">Web Defacement</option>
-                                    <option value="Judi Online (Judol)">Judi Online (Judol)</option>
-                                    <option value="Malware Injection">Malware Injection</option>
-                                    <option value="Data Leakage">Data Leakage</option>
+                                    <option value="Web Defacement / Peretasan Situs" {{ $laporan->kategori_insiden == 'Web Defacement / Peretasan Situs' ? 'selected' : '' }}>Web Defacement / Peretasan Situs</option>
+                                    <option value="Judi Online (Judol)" {{ $laporan->kategori_insiden == 'Judi Online (Judol)' ? 'selected' : '' }}>Judi Online (Judol)</option>
+                                    <option value="Malware / Ransomware Infection" {{ $laporan->kategori_insiden == 'Malware / Ransomware Infection' ? 'selected' : '' }}>Malware / Ransomware Infection</option>
+                                    <option value="Phishing Page / Social Engineering" {{ $laporan->kategori_insiden == 'Phishing Page / Social Engineering' ? 'selected' : '' }}>Phishing Page / Social Engineering</option>
+                                    <option value="DDoS Attack / Kelumpuhan Jaringan" {{ $laporan->kategori_insiden == 'DDoS Attack / Kelumpuhan Jaringan' ? 'selected' : '' }}>DDoS Attack / Kelumpuhan Jaringan</option>
                                 @endif
-                                <option value="Lainnya" {{ old('category') == 'Lainnya' ? 'selected' : '' }}>-- Kategori Insiden Baru (Input Manual) --</option>
+                                <option value="Lainnya" {{ !in_array($laporan->kategori_insiden, $listKategori ?? []) && $laporan->kategori_insiden ? 'selected' : '' }}>-- Kategori Insiden Baru (Input Manual) --</option>
                             </select>
-                            <input type="text" name="category_manual" id="categoryManualInput" class="form-control input-gov mt-2 d-none auto-save" value="{{ old('category_manual') }}" placeholder="Tuliskan kategori insiden baru...">
+                            <input type="text" name="category_manual" id="categoryManualInput" class="form-control input-gov mt-2 d-none" value="{{ !in_array($laporan->kategori_insiden, $listKategori ?? []) && $laporan->kategori_insiden ? $laporan->kategori_insiden : '' }}" placeholder="Tuliskan kategori insiden baru...">
                             <div class="invalid-feedback small">Kategori insiden wajib ditentukan.</div>
                         </div>
 
@@ -350,13 +297,13 @@
                             <label class="form-label fw-bold text-dark mb-1">URL Target Sasaran (Opsional)</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-link"></i></span>
-                                <input type="url" name="target_url" class="form-control input-gov border-start-0 auto-save" value="{{ old('target_url') }}" placeholder="https://contoh-sasaran.go.id/path">
+                                <input type="url" name="target_url" class="form-control input-gov border-start-0" value="{{ $laporan->target_url }}" placeholder="https://contoh-sasaran.go.id/path">
                             </div>
                         </div>
 
                         <div class="col-12">
                             <label class="form-label fw-bold text-dark mb-1">Kronologi Temuan & Dampak <span class="text-danger">*</span></label>
-                            <textarea name="description" id="description" class="form-control input-gov auto-save" rows="4" placeholder="Uraikan kronologi temuan secara rinci: waktu, indikator, dampak, dan langkah awal yang telah diambil..." required>{{ old('description') }}</textarea>
+                            <textarea name="description" id="description" class="form-control input-gov" rows="4" placeholder="Uraikan kronologi temuan secara rinci: waktu, indikator, dampak, dan langkah awal yang telah diambil..." required>{{ $laporan->description }}</textarea>
                             <div class="invalid-feedback small">Deskripsi kronologi temuan wajib diisi.</div>
                         </div>
                     </div>
@@ -379,17 +326,17 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark mb-1">Tingkat Ancaman / Threat Level <span class="text-danger">*</span></label>
-                            <select name="threat_level" id="threat_level" class="form-select input-gov auto-save" required>
-                                <option value="Low" {{ old('threat_level') == 'Low' ? 'selected' : '' }}>Low (Rendah)</option>
-                                <option value="Medium" {{ old('threat_level', 'Medium') == 'Medium' ? 'selected' : '' }}>Medium (Sedang)</option>
-                                <option value="High" {{ old('threat_level') == 'High' ? 'selected' : '' }}>High (Tinggi)</option>
-                                <option value="Critical" {{ old('threat_level') == 'Critical' ? 'selected' : '' }}>Critical (Sangat Kritis)</option>
+                            <select name="threat_level" id="threat_level" class="form-select input-gov" required>
+                                <option value="Low" {{ $laporan->threat_level == 'Low' ? 'selected' : '' }}>Low (Rendah)</option>
+                                <option value="Medium" {{ $laporan->threat_level == 'Medium' ? 'selected' : '' }}>Medium (Sedang)</option>
+                                <option value="High" {{ $laporan->threat_level == 'High' ? 'selected' : '' }}>High (Tinggi)</option>
+                                <option value="Critical" {{ $laporan->threat_level == 'Critical' ? 'selected' : '' }}>Critical (Sangat Kritis)</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label fw-bold text-dark mb-1">Catatan Koordinasi / Disposisi (Opsional)</label>
-                            <input type="text" name="coordination_note" class="form-control input-gov auto-save" value="{{ old('coordination_note') }}" placeholder="Catatan opsional untuk verifikator/admin...">
+                            <input type="text" name="coordination_note" class="form-control input-gov" value="{{ $laporan->coordination_note }}" placeholder="Catatan opsional untuk verifikator/admin...">
                         </div>
 
                         <div class="col-12 mt-3">
@@ -412,8 +359,8 @@
                                 <div class="d-flex align-items-center gap-3">
                                     <div id="visualPreviewHolder"></div>
                                     <div class="text-truncate">
-                                        <span class="fw-bold d-block small text-dark" id="previewName">-</span>
-                                        <small class="text-muted font-monospace" id="previewSize">-</small>
+                                        <span class="fw-bold d-block small text-dark" id="previewName">{{ $laporan->file_evidence ?? 'File bukti sudah ada' }}</span>
+                                        <small class="text-muted font-monospace" id="previewSize">File bukti existing</small>
                                     </div>
                                     <button type="button" class="btn-close ms-auto" onclick="clearFileSelection()" aria-label="Hapus File"></button>
                                 </div>
@@ -426,7 +373,7 @@
                             <i class="fas fa-arrow-left me-2"></i> Kembali
                         </button>
                         <button type="submit" id="btnSubmitForm" class="btn btn-primary px-4 rounded-2 fw-bold d-inline-flex align-items-center">
-                            <i class="fas fa-save me-2"></i> Simpan Log Patroli
+                            <i class="fas fa-save me-2"></i> Simpan Perbaikan & Kirim Ulang
                         </button>
                     </div>
                 </div>
@@ -438,21 +385,10 @@
 
 @push('scripts')
 <script>
-    const DRAFT_STORAGE_KEY = 'patroli_siber_form_draft';
-
     document.addEventListener('DOMContentLoaded', function() {
-        // Init Manual Input jika terdapat value
+        // Init Manual Input jika ada old() value
         handleManualToggle('agency');
         handleManualToggle('category');
-
-        // Cek Keberadaan Draft LocalStorage
-        checkExistingDraft();
-
-        // Bind listener auto save pada form inputs
-        document.querySelectorAll('.auto-save').forEach(element => {
-            element.addEventListener('input', saveDraftData);
-            element.addEventListener('change', saveDraftData);
-        });
 
         // 1. Live Filter Dropdown OPD / Instansi
         document.getElementById('opdFilterInput')?.addEventListener('input', function(e) {
@@ -470,47 +406,32 @@
             }
         });
 
-        // 2. Global Submit Handler dengan Cross-Step Validation & Draft Clearing
+        // 2. Form Submission Handler & Preventing Double Submit
         const patrolForm = document.getElementById('patrolForm');
         patrolForm?.addEventListener('submit', function(e) {
             const fileInput = document.getElementById('file-bukti');
-            const alertBox = document.getElementById('error-file-alert');
-            const alertText = document.getElementById('error-file-text');
-
-            // Check A: Validasi Berkas Bukti
+            
             if (!fileInput.files || fileInput.files.length === 0) {
-                e.preventDefault();
-                e.stopPropagation();
-                alertText.innerText = 'Harap unggah berkas bukti terlebih dahulu!';
-                alertBox.classList.remove('d-none');
-                jumpToStep(3);
-                return false;
+                // Allow submit without new file if existing evidence exists
+                @if(!$laporan->file_evidence)
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const alertBox = document.getElementById('error-file-alert');
+                    const alertText = document.getElementById('error-file-text');
+                    alertText.innerText = 'Harap unggah berkas bukti terlebih dahulu!';
+                    alertBox.classList.remove('d-none');
+                    return false;
+                @endif
             }
 
-            // Check B: Validasi Seluruh Input dalam Form
             if (!patrolForm.checkValidity()) {
                 e.preventDefault();
                 e.stopPropagation();
-                
-                const firstInvalid = patrolForm.querySelector(':invalid');
-                if (firstInvalid) {
-                    const stepDiv = firstInvalid.closest('.wizard-step-content');
-                    if (stepDiv) {
-                        const targetStep = parseInt(stepDiv.id.replace('wizard-step-', ''));
-                        jumpToStep(targetStep);
-                    }
-                    firstInvalid.classList.add('is-invalid');
-                    firstInvalid.focus();
-                }
-                
                 patrolForm.classList.add('was-validated');
                 return false;
             }
 
-            // Hapus Draft jika form valid dan siap dikirim
-            localStorage.removeItem(DRAFT_STORAGE_KEY);
-
-            // Ubah State Tombol ke Loading State
+            // Disable submit button & show spinner
             const btnSubmit = document.getElementById('btnSubmitForm');
             if (btnSubmit) {
                 btnSubmit.disabled = true;
@@ -519,41 +440,7 @@
         });
     });
 
-    // 3. Auto-Save Draft System
-    function saveDraftData() {
-        const formData = {};
-        document.querySelectorAll('.auto-save').forEach(input => {
-            formData[input.name] = input.value;
-        });
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formData));
-    }
-
-    function checkExistingDraft() {
-        const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
-        const restoreBtn = document.getElementById('btnRestoreDraft');
-        if (draft && restoreBtn) {
-            restoreBtn.classList.remove('d-none');
-        }
-    }
-
-    function restoreDraftData() {
-        const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
-        if (!draft) return;
-
-        const formData = JSON.parse(draft);
-        Object.keys(formData).forEach(key => {
-            const field = document.querySelector(`[name="${key}"]`);
-            if (field) {
-                field.value = formData[key];
-            }
-        });
-
-        handleManualToggle('agency');
-        handleManualToggle('category');
-        document.getElementById('btnRestoreDraft')?.classList.add('d-none');
-    }
-
-    // 4. Toggle Input Manual untuk OPD & Kategori
+    // 3. Toggle Input Manual untuk OPD & Kategori
     function handleManualToggle(type) {
         if (type === 'agency') {
             const select = document.getElementById('agencySelect');
@@ -564,7 +451,6 @@
             } else if (manualInput) {
                 manualInput.classList.add('d-none');
                 manualInput.required = false;
-                manualInput.value = '';
             }
         } else if (type === 'category') {
             const select = document.getElementById('categorySelect');
@@ -575,12 +461,11 @@
             } else if (manualInput) {
                 manualInput.classList.add('d-none');
                 manualInput.required = false;
-                manualInput.value = '';
             }
         }
     }
 
-    // 5. Wizard Step Navigation & Progress Engine
+    // 4. Multi-Step Wizard Navigation & Validation
     function nextWizardStep(current, next) {
         const currentStepDiv = document.getElementById(`wizard-step-${current}`);
         const inputs = currentStepDiv.querySelectorAll('input[required], select[required], textarea[required]');
@@ -596,53 +481,47 @@
         });
 
         if (isValid) {
-            jumpToStep(next);
+            currentStepDiv.classList.remove('active');
+            document.getElementById(`wizard-step-${next}`).classList.add('active');
+
+            // Update Header Indicators
+            const currentItem = document.getElementById(`step-node-${current}`);
+            const nextItem = document.getElementById(`step-node-${next}`);
+            
+            currentItem.classList.remove('active');
+            currentItem.classList.add('completed');
+            document.getElementById(`step-icon-${current}`).innerHTML = '<i class="fas fa-check"></i>';
+            
+            nextItem.classList.add('active');
         }
     }
 
     function prevWizardStep(target) {
-        jumpToStep(target);
+        const current = target + 1;
+        document.getElementById(`wizard-step-${current}`).classList.remove('active');
+        document.getElementById(`wizard-step-${target}`).classList.add('active');
+
+        const currentItem = document.getElementById(`step-node-${current}`);
+        const targetItem = document.getElementById(`step-node-${target}`);
+
+        currentItem.classList.remove('active');
+        targetItem.classList.remove('completed');
+        targetItem.classList.add('active');
+        document.getElementById(`step-icon-${target}`).innerText = target;
     }
 
-    function jumpToStep(targetStep) {
-        document.querySelectorAll('.wizard-step-content').forEach(el => el.classList.remove('active'));
-        document.getElementById(`wizard-step-${targetStep}`).classList.add('active');
-
-        // Update Progress Bar Percentage Width
-        const progressBarFill = document.getElementById('wizardProgressBar');
-        if (progressBarFill) {
-            const percentage = (targetStep / 3) * 100;
-            progressBarFill.style.width = `${percentage}%`;
-        }
-
-        for (let i = 1; i <= 3; i++) {
-            const node = document.getElementById(`step-node-${i}`);
-            const icon = document.getElementById(`step-icon-${i}`);
-
-            node.classList.remove('active', 'completed');
-
-            if (i < targetStep) {
-                node.classList.add('completed');
-                icon.innerHTML = '<i class="fas fa-check"></i>';
-            } else if (i === targetStep) {
-                node.classList.add('active');
-                icon.innerText = i;
-            } else {
-                icon.innerText = i;
-            }
-        }
-    }
-
-    // 6. Strict File Validation, Drag and Drop, & Visual Previewer
+    // 5. Drag and Drop & Dynamic File Previewer
     const dropArea = document.getElementById('dropArea');
 
     if (dropArea) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            }, false);
+            dropArea.addEventListener(eventName, preventDefaults, false);
         });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
 
         ['dragenter', 'dragover'].forEach(eventName => {
             dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
@@ -656,7 +535,6 @@
             const dt = e.dataTransfer;
             const files = dt.files;
             const fileInput = document.getElementById('file-bukti');
-
             if (files && files.length > 0) {
                 fileInput.files = files;
                 handleFileSelect(fileInput);
@@ -676,16 +554,6 @@
 
         if (input.files && input.files[0]) {
             const file = input.files[0];
-            const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx'];
-            const fileExtension = file.name.split('.').pop().toLowerCase();
-
-            // Validasi Ekstensi Berkas
-            if (!allowedExtensions.includes(fileExtension)) {
-                alertText.innerText = `Format file .${fileExtension} tidak diizinkan! Pilih format JPG, PNG, PDF, DOCX, atau XLSX.`;
-                alertBox.classList.remove('d-none');
-                clearFileSelection();
-                return;
-            }
 
             // Validasi Ukuran (Maksimal 2MB)
             if (file.size > 2 * 1024 * 1024) {
@@ -699,7 +567,7 @@
             previewSize.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
             previewContainer.style.display = 'block';
 
-            // Visual Preview (Image vs Document)
+            // Preview Visual (Gambar vs Dokumen)
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -708,9 +576,9 @@
                 reader.readAsDataURL(file);
             } else {
                 let icon = 'fa-file-alt text-secondary';
-                if (file.type.includes('pdf') || fileExtension === 'pdf') icon = 'fa-file-pdf text-danger';
-                else if (fileExtension === 'docx') icon = 'fa-file-word text-primary';
-                else if (fileExtension === 'xlsx') icon = 'fa-file-excel text-success';
+                if (file.type.includes('pdf')) icon = 'fa-file-pdf text-danger';
+                else if (file.name.endsWith('.docx')) icon = 'fa-file-word text-primary';
+                else if (file.name.endsWith('.xlsx')) icon = 'fa-file-excel text-success';
 
                 visualHolder.innerHTML = `<i class="fas ${icon} fa-2x"></i>`;
             }

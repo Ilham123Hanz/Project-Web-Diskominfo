@@ -133,8 +133,8 @@
 
         /* Header Logo & Icon */
         .brand-header-icon {
-            width: 50px;
-            height: 50px;
+            width: 52px;
+            height: 52px;
             background: rgba(0, 82, 163, 0.08);
             border: 1.5px solid rgba(0, 82, 163, 0.18);
             border-radius: 50%;
@@ -160,9 +160,9 @@
             font-weight: 500;
         }
 
-        /* Label Form & Input Formatting (Jarak Lega & Jelas) */
+        /* Form Formatting */
         .form-group-custom {
-            margin-bottom: 1.25rem; /* Memberikan jarak antar input agar tidak dempet */
+            margin-bottom: 1.25rem;
         }
 
         .form-label-custom {
@@ -191,12 +191,12 @@
         .focus-cyber {
             background-color: #F8FAFC !important;
             border: 1.5px solid #CBD5E1 !important;
-            padding: 10px 14px 10px 42px !important; /* Padding pas & tinggi ~44px */
+            padding: 10px 42px 10px 42px !important;
             border-radius: 10px !important;
             font-size: 0.875rem !important;
             color: var(--text-dark) !important;
             font-weight: 500;
-            height: 44px;
+            height: 46px;
             transition: all 0.2s ease-in-out;
         }
 
@@ -213,7 +213,7 @@
         /* Toggle Password Button */
         .password-toggle-btn {
             position: absolute;
-            right: 10px;
+            right: 12px;
             top: 50%;
             transform: translateY(-50%);
             background: none;
@@ -225,6 +225,9 @@
             font-size: 0.9rem;
             border-radius: 6px;
             transition: color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .password-toggle-btn:hover {
@@ -324,7 +327,7 @@
 
             <!-- NOTIFIKASI SUKSES -->
             @if(session('status') || session('success'))
-                <div class="alert alert-success border-0 text-success small fw-bold bg-success bg-opacity-10 mb-3.5 p-2.5 px-3 rounded-3 shadow-sm d-flex align-items-center" style="font-size: 0.8rem;">
+                <div class="alert alert-success border-0 text-success small fw-bold bg-success bg-opacity-10 mb-3 p-2.5 px-3 rounded-3 shadow-sm d-flex align-items-center" style="font-size: 0.8rem;">
                     <i class="fas fa-check-circle me-2 flex-shrink-0" style="font-size: 1rem;"></i>
                     <div>{{ session('status') ?? session('success') }}</div>
                 </div>
@@ -332,7 +335,7 @@
 
             <!-- NOTIFIKASI ERROR -->
             @if($errors->any())
-                <div class="alert alert-danger border-0 text-danger bg-danger bg-opacity-10 mb-3.5 p-2.5 px-3 rounded-3 shadow-sm">
+                <div class="alert alert-danger border-0 text-danger bg-danger bg-opacity-10 mb-3 p-2.5 px-3 rounded-3 shadow-sm">
                     <div class="d-flex align-items-center fw-bold mb-1" style="font-size: 0.8rem;">
                         <i class="fas fa-triangle-exclamation me-2 flex-shrink-0" style="font-size: 0.95rem;"></i>
                         <span>Otorisasi Akses Gagal!</span>
@@ -345,8 +348,8 @@
                 </div>
             @endif
 
-            <!-- FORM LOGIN Utama -->
-            <form action="{{ route('login.post') }}" method="POST" autocomplete="off" class="needs-validation" novalidate>
+            <!-- FORM LOGIN UTAMA -->
+            <form action="{{ route('login.post') }}" method="POST" id="mainLoginForm" autocomplete="off" class="needs-validation" novalidate>
                 @csrf
                 
                 <!-- Input Username / NPM / NIP -->
@@ -382,19 +385,21 @@
                     </div>
                 </div>
 
-                <!-- Remember Me & Lupa Password (Diberi Jarak Atas & Bawah) -->
+                <!-- Remember Me & Lupa Password -->
                 <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
                     <div class="form-check d-flex align-items-center">
-                        <input class="form-check-input mt-0 me-1.5" type="checkbox" name="remember" id="rememberMe" {{ old('remember') ? 'checked' : '' }} style="transform: scale(0.95); cursor: pointer;">
+                        <input class="form-check-input mt-0 me-2" type="checkbox" name="remember" id="rememberMe" {{ old('remember') ? 'checked' : '' }} style="transform: scale(1); cursor: pointer;">
                         <label class="form-check-label" for="rememberMe">
                             Ingat Saya
                         </label>
                     </div>
-                    <a href="{{ route('password.request') }}" class="text-decoration-none link-custom" style="font-size: 0.8rem;">Lupa Password?</a>
+                    @if(Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" class="text-decoration-none link-custom" style="font-size: 0.8rem;">Lupa Password?</a>
+                    @endif
                 </div>
 
                 <!-- Tombol Submit Enkripsi Masuk -->
-                <button type="submit" class="btn btn-cyber-submit w-100 mb-3.5">
+                <button type="submit" class="btn btn-cyber-submit w-100 mb-3">
                     <i class="fas fa-shield-lock"></i>
                     <span>Enkripsi Masuk Ke Sistem</span>
                 </button>
@@ -409,22 +414,23 @@
             </div>
 
             <!-- Peringatan Keamanan Siber (CSIRT) -->
-            <div class="security-alert-box mb-2.5">
+            <div class="security-alert-box mb-2">
                 <i class="fas fa-shield-cat me-1 text-danger"></i> 
                 <strong>PENGAWASAN KEAMANAN SIBER:</strong> Setiap aktivitas di portal ini dipantau secara <em>real-time</em>. Tindakan akses tanpa izin, peretasan, maupun pelanggaran keamanan siber akan direkam bersama alamat IP Anda dan ditindaklanjuti secara hukum ke Tim Cyber CSIRT terkait.
             </div>
 
             <!-- FOOTER DALAM CARD -->
             <div class="card-inner-footer">
-                © {{ date('Y') }} Diskominfo Provinsi Lampung.<br>Akses Terbatas Internal (Closed System v2.4).
+                © {{ date('Y') }} Diskominfo Provinsi Lampung.<br>Akses Terbatas Internal.
             </div>
 
         </div>
     </div>
 
-    <!-- Script Bootstrap & Interaktivitas Toggle Password -->
+    <!-- Script Bootstrap & Interaktivitas JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Toggle Lihat / Sembunyikan Password
         function togglePasswordVisibility() {
             const passwordField = document.getElementById("passwordField");
             const toggleIcon = document.getElementById("togglePasswordIcon");
@@ -438,7 +444,40 @@
             }
         }
 
-        // Bootstrap Native Client-side Validation
+        // Fitur Auto-Fill "Ingat Saya" menggunakan LocalStorage
+        document.addEventListener('DOMContentLoaded', function () {
+            const usernameInput = document.getElementById('usernameInput');
+            const passwordInput = document.getElementById('passwordField');
+            const rememberCheckbox = document.getElementById('rememberMe');
+            const mainLoginForm = document.getElementById('mainLoginForm');
+
+            // 1. Ambil data tersimpan dari LocalStorage jika ada
+            const savedUsername = localStorage.getItem('sip_remember_username');
+            const savedPassword = localStorage.getItem('sip_remember_password');
+
+            if (savedUsername) {
+                usernameInput.value = savedUsername;
+                rememberCheckbox.checked = true;
+            }
+            if (savedPassword) {
+                passwordInput.value = savedPassword;
+            }
+
+            // 2. Simpan atau Hapus data saat form disubmit
+            if (mainLoginForm) {
+                mainLoginForm.addEventListener('submit', function () {
+                    if (rememberCheckbox.checked) {
+                        localStorage.setItem('sip_remember_username', usernameInput.value);
+                        localStorage.setItem('sip_remember_password', passwordInput.value);
+                    } else {
+                        localStorage.removeItem('sip_remember_username');
+                        localStorage.removeItem('sip_remember_password');
+                    }
+                });
+            }
+        });
+
+        // Validasi Form Bawaan Bootstrap
         (function () {
             'use strict'
             var forms = document.querySelectorAll('.needs-validation')

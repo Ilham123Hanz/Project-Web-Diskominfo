@@ -13,6 +13,9 @@ return new class extends Migration
     {
         Schema::create('virtual_folders', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
+            $table->foreignId('parent_id')->nullable()->constrained('virtual_folders')->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });
     }

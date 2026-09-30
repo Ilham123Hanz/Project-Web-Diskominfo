@@ -9,6 +9,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use App\Models\Presensi;
+use App\Models\Laporan;
 
 class User extends Authenticatable 
 {
@@ -148,12 +150,12 @@ class User extends Authenticatable
 
     /**
      * Mengecek apakah petugas sudah melakukan absensi masuk (clock in) hari ini.
-     * Disesuaikan dengan struktur tabel absensi Anda yang menggunakan kolom 'date'.
+     * Disesuaikan dengan struktur tabel absensi Anda yang menggunakan kolom 'tanggal_presensi'.
      */
     public function hasCheckedInToday(): bool
     {
-        return $this->attendances()
-            ->whereDate('date', Carbon::today())
+        return $this->presensi()
+            ->whereDate('tanggal_presensi', Carbon::today())
             ->exists();
     }
 
@@ -162,8 +164,8 @@ class User extends Authenticatable
      */
     public function currentAttendanceToday()
     {
-        return $this->attendances()
-            ->whereDate('date', Carbon::today())
+        return $this->presensi()
+            ->whereDate('tanggal_presensi', Carbon::today())
             ->first();
     }
 
@@ -186,18 +188,18 @@ class User extends Authenticatable
     // =========================================================================
 
     /**
-     * Relasi One-to-Many ke model Patrol (Laporan Transmisi Berkas Siber).
+     * Relasi One-to-Many ke model Laporan (Log Patroli Siber).
      */
     public function patrols(): HasMany
     {
-        return $this->hasMany(Patrol::class);
+        return $this->hasMany(Laporan::class, 'user_id');
     }
 
     /**
-     * Relasi One-to-Many ke model Attendance (Log Presensi Harian).
+     * Relasi One-to-Many ke model Presensi (Absensi Harian Petugas).
      */
-    public function attendances(): HasMany
+    public function presensi(): HasMany
     {
-        return $this->hasMany(Attendance::class);
+        return $this->hasMany(Presensi::class, 'user_id');
     }
 }

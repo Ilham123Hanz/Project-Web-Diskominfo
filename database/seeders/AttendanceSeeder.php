@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Presensi as Attendance;
+use App\Models\Presensi;
 use App\Models\User;
 use Carbon\Carbon;
 
@@ -11,9 +11,17 @@ class AttendanceSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     * HANYA membuat data presensi untuk testing manual - DISABLED BY DEFAULT.
+     * Untuk mengaktifkan: set env SEED_ATTENDANCE_DUMMY=true
      */
     public function run(): void
     {
+        // Hanya jalankan jika environment variable SEED_ATTENDANCE_DUMMY=true
+        if (!env('SEED_ATTENDANCE_DUMMY', false)) {
+            $this->command->info('AttendanceSeeder skipped. Set SEED_ATTENDANCE_DUMMY=true to enable.');
+            return;
+        }
+
         // 1. Ambil seluruh user dengan role Petugas
         $petugasUsers = User::where('role', 'Petugas')
             ->orWhere('role', 'petugas')
@@ -70,8 +78,8 @@ class AttendanceSeeder extends Seeder
                 }
 
                 // Kalkulasi status_in menggunakan method helper bawaan model jika ada
-                $statusIn = method_exists(Attendance::class, 'checkIsLate')
-                    ? Attendance::checkIsLate($clockInTime)
+                $statusIn = method_exists(Presensi::class, 'checkIsLate')
+                    ? Presensi::checkIsLate($clockInTime)
                     : ($clockInTime > '07:30:00' ? 'Terlambat' : 'Tepat Waktu');
 
                 // --- LOGIKA WAKTU PULANG (CLOCK OUT) ---
@@ -93,11 +101,11 @@ class AttendanceSeeder extends Seeder
                         $clockOutTime = Carbon::createFromTime(16, rand(0, 59), rand(0, 59))->toTimeString();
                     }
 
-                    $statusOut = method_exists(Attendance::class, 'checkIsEarlyLeave')
-                        ? Attendance::checkIsEarlyLeave($clockOutTime)
-                        : ($clockOutTime < '16:00:00' ? 'Pulang Awal' : 'Sesuai Jam Kerja');
+                    $statusOut = method_exists(Presensi::class, 'checkIsEarlyLeave')
+                        ? Presensi::checkIsEarlyLeave($clockOutTime)
+                        : ($clockOutTime < '16:00:00' ? 'Pulang Cepat' : 'Selesai');
 
-                    $notesOut = $statusOut === 'Pulang Awal'
+                    $notesOut = $statusOut === 'Pulang Cepat'
                         ? 'Izin penanganan insiden siber mendesak di lokasi OPD luar.'
                         : 'Serah terima workstation dan log operasional shift selesai.';
                 }
@@ -114,21 +122,22 @@ class AttendanceSeeder extends Seeder
                 $lngIn = $baseLng + (rand(-100, 100) / 100000);
 
                 // --- PERSISTENSI DATA IDEMPOTEN (AMEN TERHADAP RE-SEED & UNIQUE CONSTRAINT) ---
-                Attendance::updateOrCreate(
+                Presensi::updateOrCreate(
                     [
                         'user_id'         => $user->id,
-                        'attendance_date' => $date->toDateString(),
+                        'tanggal_presensi' => $date->toDateString(),
                     ],
                     [
-                        'clock_in'       => $clockInTime,
-                        'clock_out'      => $clockOutTime,
-                        'status_in'      => $statusIn,
-                        'status_out'     => $statusOut,
-                        'notes_in'       => $notesIn,
-                        'notes_out'      => $notesOut,
-                        'ip_address_in'  => '192.168.10.' . rand(10, 254),
-                        'ip_address_out' => $clockOutTime ? '192.168.10.' . rand(10, 254) : null,
-                        'device_agent'   => $userAgents[array_rand($userAgents)],
+                        'jam_masuk'       => $clockInTime,
+                        'jam_pulang'      => $clockOutTime,
+                        'status_masuk'    => $statusIn,
+                        'status_pulang'   => $statusOut,
+                        'catatan_masuk'   => $notesIn,
+                        'catatan_pulang'  => $notesOut,
+                        'ip_address_masuk'  => '192.168.10.' . rand(10, 254),
+                        'ip_address_pulang' => $clockOutTime ? '192.168.10.' . rand(10, 254) : null,
+                        'user_agent_masuk'  => $userAgents[array_rand($userAgents)],
+                        'user_agent_pulang' => $clockOutTime ? $userAgents[array_rand($userAgents)] : null,
                     ]
                 );
             }

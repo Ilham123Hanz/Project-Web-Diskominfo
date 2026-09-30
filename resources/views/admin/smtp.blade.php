@@ -22,6 +22,7 @@
     <div class="fw-medium" style="font-size: 14px;">
         {{ session('success') }}
     </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 @else
 {{-- Dummy Alert Statis Sesuai Gambar Contoh --}}
@@ -37,7 +38,7 @@
 <div class="card border-0 shadow-sm rounded-4 p-4">
     <div class="table-responsive">
         <table class="table align-middle mb-0">
-            <thead class="table-light text-uppercase text-muted" style="font-size: 11px; letter-spacing: 0.5px;">
+            <thead class="table-light text-uppercase text-muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
                 <tr>
                     <th class="py-3 ps-3">ID Laporan</th>
                     <th class="py-3">OPD Tujuan</th>
@@ -46,43 +47,44 @@
                 </tr>
             </thead>
             <tbody>
-                {{-- Baris Data 1 (Contoh Sesuai Gambar) --}}
+                @forelse($patrols ?? [] as $log)
                 <tr>
-                    <td class="py-3 ps-3 fw-bold text-dark">LOG-001</td>
-                    <td class="py-3 fw-semibold text-secondary">BAPPEDA Provinsi Lampung</td>
+                    <td class="py-3 ps-3 fw-bold text-dark">{{ $log->log_code ?? 'LOG-00' . $log->id }}</td>
+                    <td class="py-3 fw-semibold text-secondary">{{ $log->opd_sasaran }}</td>
                     <td class="py-3">
-                        <span class="badge rounded-pill px-3 py-2 fw-semibold" style="background-color: #D1F8E8; color: #0F5132; font-size: 12px;">Terkirim</span>
+                        @if(strtolower($log->status) === 'pending')
+                            <span class="badge rounded-pill px-3 py-2 fw-semibold" style="background-color: #FFF3CD; color: #856404; font-size: 12px;">Antrean</span>
+                        @elseif(in_array($log->status, ['Verified', 'Approved', 'Disetujui Admin']))
+                            <span class="badge rounded-pill px-3 py-2 fw-semibold" style="background-color: #D1F8E8; color: #0F5132; font-size: 12px;">Terkirim</span>
+                        @elseif(in_array($log->status, ['Perlu Perbaikan', 'Revision', 'Revisi']))
+                            <span class="badge rounded-pill px-3 py-2 fw-semibold" style="background-color: #FFF3CD; color: #856404; font-size: 12px;">Perlu Revisi</span>
+                        @else
+                            <span class="badge rounded-pill px-3 py-2 fw-semibold" style="font-size: 12px;">{{ $log->status }}</span>
+                        @endif
                     </td>
                     <td class="py-3 text-center">
                         <div class="d-flex justify-content-center gap-2">
-                            <a href="#" class="btn btn-outline-secondary btn-sm px-3 py-2 rounded-3 fw-semibold d-inline-flex align-items-center gap-1" style="font-size: 13px;">
+                            {{-- Tombol Cetak PDF --}}
+                            <a href="{{ route('admin.laporan.patroli.pdf', $log->id) }}" target="_blank" class="btn btn-outline-secondary btn-sm px-3 py-2 rounded-3 fw-semibold d-inline-flex align-items-center gap-1" style="font-size: 13px;">
                                 <i class="fas fa-file-lines"></i> Cetak PDF
                             </a>
-                            <a href="#" class="btn btn-primary btn-sm px-3 py-2 rounded-3 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 13px; background-color: #2F6FED; border-color: #2F6FED;">
-                                <i class="fas fa-paper-plane"></i> Kirim SMTP
-                            </a>
+                            <form action="{{ route('admin.patrol.distribute', $log->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Kirim notifikasi email untuk laporan ini?')">
+                                @csrf
+                                <button type="submit" class="btn btn-primary btn-sm px-3 py-2 rounded-3 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 13px; background-color: #2F6FED; border-color: #2F6FED;">
+                                    <i class="fas fa-paper-plane"></i> Kirim SMTP
+                                </button>
+                            </form>
                         </div>
                     </td>
                 </tr>
-
-                {{-- Baris Data 2 (Contoh Sesuai Gambar) --}}
+                @empty
                 <tr>
-                    <td class="py-3 ps-3 fw-bold text-dark">LOG-002</td>
-                    <td class="py-3 fw-semibold text-secondary">Dinas Kesehatan Provinsi Lampung</td>
-                    <td class="py-3">
-                        <span class="badge rounded-pill px-3 py-2 fw-semibold" style="background-color: #FFF3CD; color: #856404; font-size: 12px;">Antrean</span>
-                    </td>
-                    <td class="py-3 text-center">
-                        <div class="d-flex justify-content-center gap-2">
-                            <a href="#" class="btn btn-outline-secondary btn-sm px-3 py-2 rounded-3 fw-semibold d-inline-flex align-items-center gap-1" style="font-size: 13px;">
-                                <i class="fas fa-file-lines"></i> Cetak PDF
-                            </a>
-                            <a href="#" class="btn btn-primary btn-sm px-3 py-2 rounded-3 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 13px; background-color: #2F6FED; border-color: #2F6FED;">
-                                <i class="fas fa-paper-plane"></i> Kirim SMTP
-                            </a>
-                        </div>
+                    <td colspan="4" class="text-center py-5 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block text-secondary opacity-50"></i>
+                        Belum ada data laporan patroli dari petugas.
                     </td>
                 </tr>
+                @endforelse
             </tbody>
         </table>
     </div>

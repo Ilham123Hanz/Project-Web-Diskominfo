@@ -7,20 +7,20 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\App;
-use Faker\Factory as Faker;
 
-class UserSeeder extends Seeder 
+class UserSeeder extends Seeder
 {
     /**
      * Menjalankan seeding data user dengan role Admin dan Petugas.
      * Menggunakan pendekatan idempotent (aman dijalankan berulang kali).
+     * HANYA membuat core users (Admin & Petugas tetap) - TIDAK membuat data dummy.
      */
-    public function run(): void 
+    public function run(): void
     {
         // Hindari error integrity constraint (Foreign Key) jika ingin membersihkan data lokal
         if (App::environment('local')) {
             Schema::disableForeignKeyConstraints();
-            User::truncate(); 
+            User::truncate();
             Schema::enableForeignKeyConstraints();
         }
 
@@ -75,10 +75,11 @@ class UserSeeder extends Seeder
         }
 
         // =========================================================================
-        // 2. OPSI DATA TAMBAHAN (HANYA AKTIF PADA LINGKUNGAN TESTING/LOCAL)
+        // 2. DATA DUMMY (HANYA UNTUK TESTING/LOCAL - DISABLED BY DEFAULT)
         // =========================================================================
-        if (App::environment('local', 'testing')) {
-            $faker = Faker::create('id_ID'); // Melokalisasi generator nama ke Indonesia
+        // Untuk mengaktifkan: set env APP_DEBUG=true dan jalankan seed manual
+        if (App::environment('local') && config('app.debug') && env('SEED_DUMMY_USERS', false)) {
+            $faker = \Faker\Factory::create('id_ID'); // Melokalisasi generator nama ke Indonesia
             
             // Buat 15 akun petugas dummy tambahan untuk testing pagination tabel rekap admin
             for ($i = 1; $i <= 15; $i++) {

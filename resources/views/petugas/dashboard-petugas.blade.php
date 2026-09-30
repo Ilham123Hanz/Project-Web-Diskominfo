@@ -1,6 +1,6 @@
 @extends('petugas.petugas-layout.petugas-layout')
 
-@section('title', 'Panel Operator Petugas Kompleks - Cyber Incident Command Center')
+@section('title', 'Panel Operator Petugas - Cyber Incident Command Center')
 
 @push('styles')
 <style>
@@ -125,7 +125,7 @@
     <div class="p-3 bg-white border rounded-3 mb-4 shadow-sm d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div class="d-flex align-items-center">
             <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3 text-primary d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
-                <i class="fas fa-user-shield"></i>
+                <i class="fas fa-user-shield fa-lg"></i>
             </div>
             <div>
                 <div class="d-flex align-items-center gap-2">
@@ -140,9 +140,9 @@
             </div>
         </div>
 
-        <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <!-- Digital Real-time Clock -->
-            <div class="clock-widget px-3 py-1.5 text-center shadow-sm d-none d-md-block">
+            <div class="clock-widget px-3 py-1.5 text-center shadow-sm d-none d-md-block me-2">
                 <div class="font-monospace fw-bold fs-6 text-warning" id="liveDigitalClock">00:00:00 WIB</div>
                 <div style="font-size: 0.65rem;" class="text-light opacity-75">WAKTU SISTEM LOKAL</div>
             </div>
@@ -150,36 +150,12 @@
             <a href="{{ route('petugas.patrol.create') }}" class="btn btn-sm btn-primary fw-bold px-3 py-2 rounded-2 d-inline-flex align-items-center shadow-sm">
                 <i class="fas fa-plus-circle me-1.5"></i> Buat Laporan Baru
             </a>
-            <span class="badge bg-dark px-3 py-2 fw-bold font-monospace" style="font-size: 0.75rem;" data-bs-toggle="tooltip" title="IP Publik Operator">
-                <i class="fas fa-network-wired me-1"></i> {{ request()->ip() }}
-            </span>
         </div>
     </div>
 
-    <!-- Alert Prioritas untuk Laporan Perlu Perbaikan -->
-    @php
-        $revisionCount = $patrols->getCollection()->whereIn('status', ['Perlu Perbaikan', 'Revision', 'Rejection'])->count();
-    @endphp
-    @if($revisionCount > 0)
-    <div class="alert alert-warning border-start border-4 border-warning bg-white shadow-sm rounded-3 p-3 mb-4 fade show d-flex align-items-center justify-content-between" role="alert">
-        <div class="d-flex align-items-center">
-            <div class="p-2 bg-warning bg-opacity-20 text-warning rounded-circle me-3">
-                <i class="fas fa-exclamation-triangle fa-lg"></i>
-            </div>
-            <div>
-                <h6 class="fw-bold mb-0 text-dark">Perhatian Required!</h6>
-                <p class="mb-0 text-muted small">Terdapat <strong>{{ $revisionCount }}</strong> laporan yang membutuhkan perbaikan data dari Anda. Silakan cek tabel di bawah.</p>
-            </div>
-        </div>
-        <a href="#tableLogSection" class="btn btn-sm btn-warning fw-bold text-dark px-3 rounded-2">
-            Perbaiki Sekarang <i class="fas fa-arrow-down ms-1"></i>
-        </a>
-    </div>
-    @endif
-
-    <!-- Alert Flash Messages -->
+    <!-- Alert Flash Messages Login / Transaksi -->
     @if(session('success')) 
-        <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success fw-semibold p-3 mb-4 rounded-3 shadow-sm alert-dismissible fade show d-flex align-items-center" role="alert">
+        <div id="autoDismissAlert" class="alert alert-success border-0 bg-success bg-opacity-10 text-success fw-semibold p-3 mb-4 rounded-3 shadow-sm alert-dismissible fade show d-flex align-items-center" role="alert">
             <i class="fas fa-check-circle fa-lg me-2"></i>
             <div>{{ session('success') }}</div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -194,11 +170,44 @@
         </div> 
     @endif
 
+    <!-- Alert Prioritas untuk Laporan Perlu Perbaikan -->
+    @php
+        $revisionCount = $patrols->getCollection()->whereIn('status', ['Perlu Perbaikan', 'Revision', 'Rejection'])->count();
+    @endphp
+    @if($revisionCount > 0)
+    <div class="alert alert-warning border-start border-4 border-warning bg-white shadow-sm rounded-3 p-3 mb-4 fade show d-flex align-items-center justify-content-between" role="alert">
+        <div class="d-flex align-items-center">
+            <div class="p-2 bg-warning bg-opacity-20 text-warning rounded-circle me-3">
+                <i class="fas fa-exclamation-triangle fa-lg"></i>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-0 text-dark">Perhatian Ditingkatkan!</h6>
+                <p class="mb-0 text-muted small">Terdapat <strong>{{ $revisionCount }}</strong> laporan yang membutuhkan perbaikan data dari Anda. Silakan periksa tabel di bawah.</p>
+            </div>
+        </div>
+        <a href="#tableLogSection" class="btn btn-sm btn-warning fw-bold text-dark px-3 rounded-2">
+            Perbaiki Sekarang <i class="fas fa-arrow-down ms-1"></i>
+        </a>
+    </div>
+    @endif
+
     <div class="row">
-        <!-- Kolom Kiri: Presensi, Shift Tracking & Quick Actions -->
+        <!-- Kolom Kiri: Presensi Shift & Tindakan/Refresh Data -->
         <div class="col-xl-3 col-lg-4 mb-4">
             
-            <!-- Card Presensi -->
+            <!-- Card Refresh Data Transmisi (Dikembalikan ke Posisi Semula di Kolom Kiri) -->
+            <div class="card border-0 shadow-sm rounded-3 mb-4 glass-card">
+                <div class="card-header bg-white fw-bold text-dark border-bottom p-3">
+                    <span class="fs-6"><i class="fas fa-bolt me-2 text-warning"></i> Akses & Tindakan</span>
+                </div>
+                <div class="card-body p-3">
+                    <button type="button" class="btn btn-outline-dark w-100 fw-bold btn-sm py-2 rounded-2 d-inline-flex align-items-center justify-content-center shadow-sm" onclick="window.location.reload()">
+                        <i class="fas fa-sync-alt me-2"></i> Refresh Data Transmisi
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card Presensi Shift Kerja -->
             <div class="card border-0 shadow-sm rounded-3 mb-4 glass-card">
                 <div class="card-header bg-white fw-bold text-dark border-bottom p-3 d-flex align-items-center justify-content-between">
                     <span class="fs-6"><i class="fas fa-clock me-2 text-primary"></i> Presensi Shift Kerja</span>
@@ -223,7 +232,7 @@
                                 <strong class="text-dark">{{ $todayAttendance->time_out ? $todayAttendance->time_out . ' WIB' : 'Belum Absen' }}</strong>
                             </div>
                             <div class="mb-0 small d-flex justify-content-between align-items-center">
-                                <span class="text-muted"><i class="fas fa-hourglass-half me-1 text-warning"></i> Total Akumulasi:</span>
+                                <span class="text-muted"><i class="fas fa-hourglass-half me-1 text-warning"></i> Akumulasi:</span>
                                 <span class="badge bg-dark font-monospace fw-normal">{{ $todayAttendance->duration ?? 'Sedang Berjalan' }}</span>
                             </div>
                         </div>
@@ -257,24 +266,6 @@
                             </a>
                         </div>
                     @endif
-                </div>
-            </div>
-
-            <!-- Card Quick Action Shortcuts -->
-            <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
-                <h6 class="fw-bold mb-3 text-dark d-flex align-items-center fs-6">
-                    <i class="fas fa-bolt me-2 text-warning"></i> Pintasan Akses Cepat
-                </h6>
-                <div class="d-grid gap-2">
-                    <a href="{{ route('petugas.patrol.create') }}" class="btn btn-outline-primary btn-sm text-start fw-semibold py-2 rounded-2 d-flex align-items-center">
-                        <i class="fas fa-pen-alt me-2 text-primary"></i> Input Laporan Patroli Baru
-                    </a>
-                    <a href="#" class="btn btn-outline-secondary btn-sm text-start fw-semibold py-2 rounded-2 d-flex align-items-center" data-bs-toggle="tooltip" title="Gunakan template resmi laporan insiden">
-                        <i class="fas fa-file-word me-2 text-primary"></i> Unduh Format Template
-                    </a>
-                    <button type="button" class="btn btn-outline-dark btn-sm text-start fw-semibold py-2 rounded-2 d-flex align-items-center" onclick="window.location.reload()">
-                        <i class="fas fa-sync-alt me-2 text-dark"></i> Refresh Data Transmisi
-                    </button>
                 </div>
             </div>
         </div>
@@ -411,16 +402,33 @@
                                     <span class="badge bg-secondary bg-opacity-75 font-monospace mt-1" style="font-size: 0.68rem;">[{{ $patrol->main_menu ?? 'N/A' }}]</span>
                                 </td>
                                 <td class="align-middle">
-                                    <span class="fw-bold text-dark d-block mb-0.5" style="font-size: 0.88rem;">{{ $patrol->opd_sasaran }}</span>
-                                    <span class="text-muted small d-block mb-1">{{ $patrol->kategori_insiden }}</span>
+                                    <span class="fw-bold text-dark d-block mb-0.5" style="font-size: 0.88rem;">{{ $patrol->opd_sasaran ?? '-' }}</span>
+                                    <span class="text-muted small d-block mb-1">{{ $patrol->kategori_insiden ?? '-' }}</span>
+                                    
                                     @if(!empty($patrol->target_url))
-                                        <a href="{{ $patrol->target_url }}" target="_blank" class="small text-truncate text-decoration-none d-inline-flex align-items-center text-primary" style="max-width: 180px;">
+                                        @php
+                                            $formattedUrl = \Illuminate\Support\Str::startsWith($patrol->target_url, ['http://', 'https://']) 
+                                                ? $patrol->target_url 
+                                                : 'http://' . $patrol->target_url;
+                                        @endphp
+                                        <a href="{{ $formattedUrl }}" target="_blank" rel="noopener noreferrer" class="small text-truncate text-decoration-none d-inline-flex align-items-center text-primary fw-semibold" style="max-width: 200px;">
                                             <i class="fas fa-external-link-alt me-1" style="font-size: 0.7rem;"></i>Tautan Target
                                         </a>
+                                    @else
+                                        <span class="small text-muted fst-italic">Tanpa URL</span>
                                     @endif
                                 </td>
                                 <td class="align-middle">
-                                    <span class="badge bg-{{ $patrol->threat_badge_color ?? 'secondary' }} px-2.5 py-1.5 fw-semibold">
+                                    @php
+                                        $threat = strtolower($patrol->threat_level ?? 'normal');
+                                        $threatClass = match($threat) {
+                                            'tinggi', 'high', 'critical', 'bahaya' => 'bg-danger text-white',
+                                            'sedang', 'medium', 'sedang/warning' => 'bg-warning text-dark',
+                                            'rendah', 'low' => 'bg-info text-dark',
+                                            default => 'bg-secondary text-white'
+                                        };
+                                    @endphp
+                                    <span class="badge {{ $threatClass }} px-2.5 py-1.5 fw-bold">
                                         {{ $patrol->threat_level ?? 'Normal' }}
                                     </span>
                                 </td>
@@ -442,7 +450,7 @@
                                 <td class="align-middle">
                                     @if(in_array($patrol->status, ['Perlu Perbaikan', 'Revision', 'Rejection']))
                                         <div class="p-2 border border-danger border-opacity-30 rounded-2 bg-danger bg-opacity-10 text-danger fw-bold small">
-                                            <i class="fas fa-exclamation-circle me-1"></i> {{ Str::limit($patrol->admin_correction ?? 'Perlu perbaikan data.', 35) }}
+                                            <i class="fas fa-exclamation-circle me-1"></i> {{ \Illuminate\Support\Str::limit($patrol->admin_correction ?? 'Perlu perbaikan data.', 35) }}
                                         </div>
                                     @elseif(in_array($patrol->status, ['Verified', 'Approved', 'Disetujui Admin']))
                                         <span class="text-success fw-bold small"><i class="fas fa-check-circle me-1"></i> Disetujui</span>
@@ -451,9 +459,16 @@
                                     @endif
                                 </td>
                                 <td class="align-middle text-center">
-                                    <button type="button" class="btn btn-sm btn-outline-dark rounded-2" data-bs-toggle="modal" data-bs-target="#detailModal{{ $patrol->id }}" title="Lihat Detail">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
+                                    <div class="btn-group gap-1" role="group">
+                                        <button type="button" class="btn btn-sm btn-outline-dark rounded-2" data-bs-toggle="modal" data-bs-target="#detailModal{{ $patrol->id }}" title="Lihat Detail">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        @if(in_array($patrol->status, ['Perlu Perbaikan', 'Revision', 'Rejection']))
+                                            <a href="{{ route('petugas.patrol.edit', $patrol->id) }}" class="btn btn-sm btn-warning rounded-2 text-dark" title="Perbaiki Laporan">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
 
@@ -471,15 +486,24 @@
                                             <div class="row g-3">
                                                 <div class="col-md-6">
                                                     <label class="text-muted small d-block">Instansi / OPD Target</label>
-                                                    <strong class="text-dark">{{ $patrol->opd_sasaran }}</strong>
+                                                    <strong class="text-dark">{{ $patrol->opd_sasaran ?? '-' }}</strong>
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="text-muted small d-block">Kategori Insiden</label>
-                                                    <strong class="text-dark">{{ $patrol->kategori_insiden }}</strong>
+                                                    <strong class="text-dark">{{ $patrol->kategori_insiden ?? '-' }}</strong>
                                                 </div>
                                                 <div class="col-md-12">
                                                     <label class="text-muted small d-block">Tautan/URL Sasaran</label>
-                                                    <a href="{{ $patrol->target_url }}" target="_blank" class="text-break">{{ $patrol->target_url ?? 'Tidak Ada Link' }}</a>
+                                                    @if(!empty($patrol->target_url))
+                                                        @php
+                                                            $modalUrl = \Illuminate\Support\Str::startsWith($patrol->target_url, ['http://', 'https://']) 
+                                                                ? $patrol->target_url 
+                                                                : 'http://' . $patrol->target_url;
+                                                        @endphp
+                                                        <a href="{{ $modalUrl }}" target="_blank" rel="noopener noreferrer" class="text-break fw-bold text-primary">{{ $patrol->target_url }}</a>
+                                                    @else
+                                                        <span class="text-muted">Tidak ada tautan</span>
+                                                    @endif
                                                 </div>
                                                 <div class="col-md-12">
                                                     <label class="text-muted small d-block">Catatan & Respon Verifikator Admin</label>
@@ -498,22 +522,25 @@
                             @empty
                             <tr>
                                 <td colspan="7" class="text-center py-5 text-muted">
-                                    <i class="fas fa-folder-open fa-3x mb-3 text-secondary opacity-50"></i>
-                                    <p class="mb-0 fw-semibold">Belum ada rekaman log data laporan siber dalam sistem.</p>
+                                    <i class="fas fa-folder-open fa-3x mb-3 text-secondary opacity-50 d-block"></i>
+                                    <span class="fw-semibold">Belum ada rekam log data transmisi laporan yang ditemukan.</span>
                                 </td>
                             </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
-                
-                <!-- Pagination -->
-                <div class="mt-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <small class="text-muted">Menampilkan data {{ $patrols->firstItem() ?? 0 }} - {{ $patrols->lastItem() ?? 0 }} dari {{ $patrols->total() }} total records</small>
+
+                <!-- Pagination Links -->
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <small class="text-muted">
+                        Menampilkan data {{ $patrols->firstItem() ?? 0 }} - {{ $patrols->lastItem() ?? 0 }} dari {{ $patrols->total() }} total records
+                    </small>
                     <div>
                         {{ $patrols->links() }}
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -522,20 +549,27 @@
 
 @push('scripts')
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    // Jam Digital Real-time sederhana
-    function updateClock() {
+    // Live Digital Clock Widget Script
+    function updateLiveClock() {
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const clockElement = document.getElementById('liveDigitalClock');
         if (clockElement) {
-            clockElement.textContent = `${hours}:${minutes}:${seconds} WIB`;
+            clockElement.innerText = `${hours}:${minutes}:${seconds} WIB`;
         }
     }
-    setInterval(updateClock, 1000);
-    updateClock();
-});
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    // Auto dismiss flash alert after 3 seconds
+    setTimeout(function() {
+        const alert = document.getElementById('autoDismissAlert');
+        if (alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    }, 3000);
 </script>
 @endpush
